@@ -20,7 +20,7 @@ npm start
 
 ```yaml
   plugins:
-    - name: SampleActionButtonDropdownPlugin
+    - name: RoomMediaPlugin
       url: http://127.0.0.1:4701/static/RoomMediaPlugin.js
 ```
 
