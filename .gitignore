@@ -1,0 +1,4 @@
+html-plugin/.idea
+html-plugin/dist
+html-plugin/node_modules
+.DS_Store
