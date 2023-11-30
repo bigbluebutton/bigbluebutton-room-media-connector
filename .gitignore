@@ -2,3 +2,10 @@ html-plugin/.idea
 html-plugin/dist
 html-plugin/node_modules
 .DS_Store
+appliance-application/dist
+appliance-application/node_modules
+.idea
+appliance-application/packages/main/dist
+appliance-application/packages/preload/dist
+appliance-application/packages/renderer/dist
+package-lock.json

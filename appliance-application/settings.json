@@ -1,0 +1,74 @@
+{
+  "control_server": {
+    "ws": "wss://domain.tld/ws_room",
+    "reconnect_interval": 5000,
+    "ping_interval": 10000
+  },
+  "room": {
+    "name": "Name of the room",
+    "bbb_user_name": "RoomMedia",
+    "bbb_user_id": "bbb-room-media",
+    "layouts": {
+      "CHAT_LEFT_VIDEO_RIGHT": {
+        "index": 0,
+        "label": "Chat left, video right",
+        "screens": {
+          "Screen left": {
+            "bbb-join-parameters": {
+              "enforceLayout": "participantsAndChatOnly",
+              "userdata-bbb_display_notifications": false,
+              "userdata-bbb_hide_nav_bar": true,
+              "userdata-bbb_auto_join_audio": false,
+              "userdata-bbb_auto_share_webcam": false
+            }
+          },
+          "Screen right": {
+            "bbb-join-parameters": {
+              "userdata-bbb_hide_actions_bar": true,
+              "enforceLayout": "camerasOnly",
+              "userdata-bbb_display_notifications": false,
+              "userdata-bbb_auto_share_webcam": true,
+              "userdata-bbb_listen_only_mode": false,
+              "userdata-bbb_skip_check_audio": true,
+              "userdata-bbb_skip_video_preview": true,
+              "userdata-bbb_preferred_camera_profile": "high",
+              "userdata-bbb_hide_nav_bar": true
+            }
+          }
+        }
+      },
+      "VIDEO_LEFT_PRESENTATION_RIGHT": {
+        "index": 1,
+        "label": "Video left, presentation right",
+        "screens": {
+          "Screen left": {
+            "bbb-join-parameters": {
+              "userdata-bbb_hide_actions_bar": true,
+              "enforceLayout": "camerasOnly",
+              "userdata-bbb_display_notifications": false,
+              "userdata-bbb_auto_share_webcam": true,
+              "userdata-bbb_listen_only_mode": false,
+              "userdata-bbb_skip_check_audio": true,
+              "userdata-bbb_skip_video_preview": true,
+              "userdata-bbb_preferred_camera_profile": "high",
+              "userdata-bbb_hide_nav_bar": true
+            }
+          },
+          "Screen right": {
+            "bbb-join-parameters": {
+              "userdata-bbb_self_view_disable": true,
+              "enforceLayout": "presentationOnly",
+              "userdata-bbb_display_notifications": false,
+              "userdata-bbb_auto_share_webcam": true,
+              "userdata-bbb_listen_only_mode": false,
+              "userdata-bbb_skip_check_audio": true,
+              "userdata-bbb_skip_video_preview": true,
+              "userdata-bbb_hide_nav_bar": true,
+              "userdata-bbb_hide_actions_bar": true
+            }
+          }
+        }
+      }
+    }
+  }
+}
