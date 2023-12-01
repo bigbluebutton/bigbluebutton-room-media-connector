@@ -145,7 +145,7 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
                             ...baseJoinParameters,
                             ...value['bbb-join-parameters'],
                             userID: baseJoinParameters.userID + "-" + key,
-                            role: 'VIEWER'
+                            role: 'MODERATOR'
                         };
                         screenJoinUrls[key] = await pluginApi.getJoinUrl(joinParametersMap);
                         // screenJoinUrls[key] = "https://bbb3-dev.virtuos.uni-osnabrueck.de/bigbluebutton/api/join?fullName=Room+Integration&meetingID=random-6478495&password=ap&redirect=true&userID=bbb-room-integration&checksum=b058fca6202700005c36675332c6ed760e8e3578";
@@ -221,8 +221,9 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
                     :
 
                     !offerResponse ? <>
-                            <h3>Please verify the pairing PIN and confirm on the appliance</h3>
-                            <h4>{pairingPin}</h4>
+                            <h3>Pairing with '{roomConfig.name}'</h3>
+                            <h4>Please verify the pairing PIN and confirm on the appliance</h4>
+                            <h2>{pairingPin}</h2>
 
                         </>
 
