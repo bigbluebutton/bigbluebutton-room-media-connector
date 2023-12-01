@@ -6,6 +6,7 @@ import BBBWebSocket from '/@/websocket';
 import LoadingSpinner from '/@/components/LoadingSpinner.vue';
 import ConnectionError from '/@/components/ConnectionError.vue';
 import RoomOffer from '/@/components/RoomOffer.vue';
+import ConfigMissing from "/@/components/ConfigMissing.vue";
 
 const config = inject('config');
 
@@ -29,23 +30,25 @@ const onNewOffer = (urls, pairingCode ) => {
 };
 
 window.electronAPI.handleTriggerNewPin(() => {
-  ws.reconnect(config.room, 1);
+  ws.reconnect(config.config.room, 1);
 });
 
 
 let ws = null;
 
 function connect(){
-  ws = new BBBWebSocket(config.control_server.ws, config.control_server.reconnect_interval, config.control_server.ping_interval);
+  ws = new BBBWebSocket(config.config.control_server.ws, config.config.control_server.reconnect_interval, config.config.control_server.ping_interval);
   ws.setConnectionStatusCallback(onConnectionChanged);
   ws.setNewPinCallback(onNewPin);
   ws.setOfferCallback(onNewOffer);
-  ws.connect(config.room);
+  ws.connect(config.config.room);
 }
 
 
 onMounted(() => {
-  connect();
+  if(config.config){
+    connect();
+  }
 });
 
 function onAcceptOffer() {
@@ -74,7 +77,7 @@ function onRejectOffer() {
       <h1 class="mt-4 text-3xl font-bold text-white sm:text-5xl">BigBlueButton</h1>
 
       <div class="block mt-4 w-full">
-        <div class="flex items-center flex-col justify-center px-10 ">
+        <div class="flex items-center flex-col justify-center px-10 " v-if="config.config">
           <loading-spinner
             v-if="!pin"
             class="my-10"
@@ -94,6 +97,7 @@ function onRejectOffer() {
             @reject="onRejectOffer"
           />
         </div>
+        <config-missing v-else :configPath="config.path" />
       </div>
     </div>
   </main>

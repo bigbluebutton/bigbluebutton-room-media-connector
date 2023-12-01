@@ -9,6 +9,7 @@ import { WebSocketLink } from '@apollo/client/link/ws';
 import { ProxyWebsocket } from './ProxyWebsocket';
 import {BBBGraphql} from '/@/bbb-graphql';
 import {join} from 'node:path';
+import {DisplayManager} from "/@/displayManager";
 
 global.WebSocket = ProxyWebsocket;
 
@@ -17,7 +18,7 @@ export class BBBMeeting{
 
   private screens;
 
-  private displays: Display[];
+  private displayManager: DisplayManager;
   private control: any;
 
   private windows: BrowserWindow[];
@@ -26,13 +27,12 @@ export class BBBMeeting{
   private bbbGraphQl: BBBGraphql;
 
 
-  constructor(control, screens) {
+  constructor(control, screens, displayManager) {
     this.screens = screens;
     this.control = control;
 
-    this.displays = screen.getAllDisplays();
+    this.displayManager = displayManager;
 
-    console.log('displays', this.displays);
     this.windows = [];
   }
 
@@ -93,16 +93,9 @@ export class BBBMeeting{
 
 
     for (const [screen, url] of Object.entries(this.screens)) {
+      const screenDisplay = this.displayManager.getDisplay(screen);
 
-      let screenDisplay = null;
-
-      this.displays.forEach((display) => {
-        if (display.label === screen) {
-          screenDisplay = display;
-        }
-      });
-
-      if (screenDisplay === null) {
+      if (screenDisplay == null) {
         console.log('screen ' + screen + ' not found');
         continue;
       }

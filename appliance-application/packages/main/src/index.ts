@@ -1,5 +1,5 @@
 import {app, systemPreferences, protocol} from 'electron';
-//import './security-restrictions';
+import './security-restrictions';
 import {restoreOrCreateWindow, hdiDevices } from '/@/mainWindow';
 import {openStreamDeck} from '@elgato-stream-deck/node';
 import {StreamDeckHID} from '/@/streamdeck';
@@ -24,11 +24,16 @@ app.disableHardwareAcceleration();
  * Shout down background process if all windows was closed
  */
 app.on('window-all-closed', async () => {
+
+
+  app.quit();
+});
+
+app.on('before-quit', async function () {
+  console.log("closing");
   for (const device of hdiDevices) {
     await device.close();
   }
-
-  app.quit();
 });
 
 /**

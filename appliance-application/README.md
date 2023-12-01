@@ -27,6 +27,7 @@ Place the settings config file `settings.json` in the following folder:
 
 - You have to adjust the `control_server.ws` setting to point to the location of the pairing server.
 - Next `room.name` should be set to the name of the room that should be shown during the pairing process.
+- You can also set `preferred_pin_screen` to the name of the screen that should be used to display the pairing pin. If the screen it not found, it uses the first screen it finds.
 - Lastly you need to define the layouts, a few examples are provided in `room.layouts`.
 The key of the layouts property `screen` is the name of the screen name provided by the operating system.
 

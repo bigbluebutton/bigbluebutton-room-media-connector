@@ -1,36 +1,11 @@
-import type {Session} from 'electron';
-import {app, shell} from 'electron';
+import {app} from 'electron';
 import {URL} from 'node:url';
 
 /**
- * Union for all existing permissions in electron
+ * A list of permissions that are allowed for all origins.
  */
-type Permission = Parameters<
-  Exclude<Parameters<Session['setPermissionRequestHandler']>[0], null>
->[1];
+const ALLOWED_PERMISSIONS = ['media'];
 
-/**
- * A list of origins that you allow open INSIDE the application and permissions for them.
- *
- * In development mode you need allow open `VITE_DEV_SERVER_URL`.
- */
-const ALLOWED_ORIGINS_AND_PERMISSIONS = new Map<string, Set<Permission>>(
-  import.meta.env.DEV && import.meta.env.VITE_DEV_SERVER_URL
-    ? [[new URL(import.meta.env.VITE_DEV_SERVER_URL).origin, new Set()]]
-    : [],
-);
-
-/**
- * A list of origins that you allow open IN BROWSER.
- * Navigation to the origins below is only possible if the link opens in a new window.
- *
- * @example
- * <a
- *   target="_blank"
- *   href="https://github.com/"
- * >
- */
-const ALLOWED_EXTERNAL_ORIGINS = new Set<`https://${string}`>(['https://github.com']);
 
 app.on('web-contents-created', (_, contents) => {
   /**
@@ -41,11 +16,7 @@ app.on('web-contents-created', (_, contents) => {
    *
    * @see https://www.electronjs.org/docs/latest/tutorial/security#13-disable-or-limit-navigation
    */
-  contents.on('will-navigate', (event, url) => {
-    const {origin} = new URL(url);
-    if (ALLOWED_ORIGINS_AND_PERMISSIONS.has(origin)) {
-      return;
-    }
+  contents.on('will-navigate', (event) => {
 
     // Prevent navigation
     event.preventDefault();
@@ -64,7 +35,7 @@ app.on('web-contents-created', (_, contents) => {
   contents.session.setPermissionRequestHandler((webContents, permission, callback) => {
     const {origin} = new URL(webContents.getURL());
 
-    const permissionGranted = !!ALLOWED_ORIGINS_AND_PERMISSIONS.get(origin)?.has(permission);
+    const permissionGranted = ALLOWED_PERMISSIONS.includes(permission);
     callback(permissionGranted);
 
     if (!permissionGranted && import.meta.env.DEV) {
@@ -82,16 +53,7 @@ app.on('web-contents-created', (_, contents) => {
    * @see https://www.electronjs.org/docs/latest/tutorial/security#14-disable-or-limit-creation-of-new-windows
    * @see https://www.electronjs.org/docs/latest/tutorial/security#15-do-not-use-openexternal-with-untrusted-content
    */
-  contents.setWindowOpenHandler(({url}) => {
-    const {origin} = new URL(url);
-
-    if (ALLOWED_EXTERNAL_ORIGINS.has(origin as `https://${string}`)) {
-      // Open url in default browser.
-      shell.openExternal(url).catch(console.error);
-    } else if (import.meta.env.DEV) {
-      console.warn(`Blocked the opening of a disallowed origin: ${origin}`);
-    }
-
+  contents.setWindowOpenHandler(() => {
     // Prevent creating a new window.
     return {action: 'deny'};
   });

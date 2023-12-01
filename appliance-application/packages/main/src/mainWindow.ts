@@ -1,4 +1,4 @@
-import {app, BrowserWindow, ipcMain, session} from 'electron';
+import {app, BrowserWindow, ipcMain, screen, session} from 'electron';
 import {join, resolve} from 'node:path';
 import {openStreamDeck} from '@elgato-stream-deck/node';
 import fs from 'fs';
@@ -7,6 +7,7 @@ import {HID} from '/@/HID';
 import {BBBMeeting} from '/@/bbb-meeting';
 import {fileURLToPath} from "url";
 import path from "path";
+import {DisplayManager} from "/@/displayManager";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,9 +16,30 @@ export const hdiDevices:HID[] = [];
 
 async function createWindow() {
 
+  // Loading config file
+  const appUserDataPath = app.getPath('userData');
+  const path = appUserDataPath + '/settings.json';
+  let config = null;
+  try {
+    config = JSON.parse(fs.readFileSync( path, 'utf8'));
+  } catch (e) {
+    console.log('No config found');
+  }
+
+  // Get all connected screens
+  const displayManager = new DisplayManager();
+
+  // Get display for the pin screen
+  const pinDisplayLabel = config ? config['preferred_pin_screen'] : '';
+  const pinDisplay = displayManager.getDisplay(pinDisplayLabel) || displayManager.getDisplays()[0];
+
   const browserWindow = new BrowserWindow({
     show: false, // Use the 'ready-to-show' event to show the instantiated BrowserWindow.
-    //fullscreen: true,
+    width: pinDisplay.size.width,
+    height: pinDisplay.size.height,
+    x: pinDisplay.bounds.x,
+    y: pinDisplay.bounds.y,
+    fullscreen: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -28,13 +50,7 @@ async function createWindow() {
   });
 
   ipcMain.handle('getConfig', () => {
-    const appUserDataPath = app.getPath('userData');
-
-    try {
-      return JSON.parse(fs.readFileSync(appUserDataPath + '/settings.json', 'utf8'));
-    } catch (e) {
-      return null;
-    }
+    return {path, config}
   });
 
   ipcMain.on('newOffer', () => {
@@ -54,7 +70,7 @@ async function createWindow() {
       device.acceptedOffer();
     });
 
-    const bbbMeeting = new BBBMeeting(offer.urls.control, offer.urls.screens);
+    const bbbMeeting = new BBBMeeting(offer.urls.control, offer.urls.screens, displayManager);
 
     const leaveCallback = () => {
       console.log("should leave software");
@@ -107,7 +123,7 @@ async function createWindow() {
     browserWindow?.show();
 
     if (import.meta.env.DEV) {
-      //browserWindow?.webContents.openDevTools();
+      browserWindow?.webContents.openDevTools();
     }
   });
 

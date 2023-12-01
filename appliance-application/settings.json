@@ -4,6 +4,7 @@
     "reconnect_interval": 5000,
     "ping_interval": 10000
   },
+  "preferred_pin_screen": "Screen left",
   "room": {
     "name": "Name of the room",
     "bbb_user_name": "RoomMedia",
