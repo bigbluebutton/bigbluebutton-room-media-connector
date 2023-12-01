@@ -5,6 +5,11 @@ import fs from 'fs';
 import {StreamDeckHID} from '/@/streamdeck';
 import {HID} from '/@/HID';
 import {BBBMeeting} from '/@/bbb-meeting';
+import {fileURLToPath} from "url";
+import path from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const hdiDevices:HID[] = [];
 
