@@ -9,3 +9,4 @@ appliance-application/packages/main/dist
 appliance-application/packages/preload/dist
 appliance-application/packages/renderer/dist
 package-lock.json
+__pycache__

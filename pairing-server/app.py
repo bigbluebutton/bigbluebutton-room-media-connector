@@ -50,6 +50,7 @@ async def generate_pin_task(channel, config):
 @app.websocket('/ws_room')
 async def handle_room() -> None:
     redis = await aioredis.from_url(redis_url)
+    psub = None
     pin_task = None
     forward_task = None
     try:
@@ -60,7 +61,7 @@ async def handle_room() -> None:
         psub = redis.pubsub()
         channel_name = f'bbb:client:{client_id}'
         print(channel_name)
-        pin_task = asyncio.create_task(generate_pin_task(channel_name, config))
+        pin_task = asyncio.create_task(generate_pin_task(channel_name, config), name=f"pin_generate_{client_id}")
         async with psub as p:
             await p.subscribe(channel_name)
             while True:
@@ -75,7 +76,7 @@ async def handle_room() -> None:
                                 pin = msg['pin']
                                 await redis.set(f'bbb:pins:{pin}', json.dumps(config), ex=pin_rollover)
                                 await redis.set(f'bbb:clients:{pin}', client_id, ex=pin_rollover)
-                                await websocket.send(json.dumps({'action': 'new_pin', 'pin': pin}))
+                                await websocket.send(json.dumps({'action': 'new_pin', 'pin': pin, 'timeout': pin_rollover}))
                             elif 'start' in msg:
                                 await websocket.send(json.dumps({'action': 'start', 'urls': msg['urls'], 'pairing_pin': msg['pairing_pin']}))
                                 plugin_channel = f"bbb:client:{msg['client_id']}"
@@ -88,10 +89,11 @@ async def handle_room() -> None:
                 except asyncio.TimeoutError:
                     print("room timeout")
             await p.unsubscribe(channel_name)
-        await psub.close()
     finally:
         print("room close")
         await redis.close()
+        if psub:
+            await psub.close()
         if pin_task:
             pin_task.cancel()
         if forward_task:

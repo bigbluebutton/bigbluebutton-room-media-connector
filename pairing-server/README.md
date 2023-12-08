@@ -48,3 +48,15 @@ location /hybrid {
 You need only one room integration server per BigBlueButton cluster. So this software does not need to run on a BigBlueButton Server but it is not forbidden to do so.
 
 To run it in production, you can use any ASGI compatible application server such as hypercorn.
+
+## Running tests
+
+1. Install test dependencies
+```bash
+. env/bin/activate
+pip install -r requirements-test.txt
+```
+2. Execute tests
+```bash
+pytest
+```
