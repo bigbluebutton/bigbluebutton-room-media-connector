@@ -1,6 +1,7 @@
 import asyncio
 import pytest
 from async_timeout import timeout
+from quart.testing.connections import WebsocketDisconnectError
 
 from app import app
 import json
@@ -16,18 +17,35 @@ def with_timeout(t):
 @pytest.mark.asyncio
 @with_timeout(1)
 async def test_room_get_pin():
-    test_client = app.test_client()
-    async with test_client.websocket('/ws_room') as test_websocket:
-        await test_websocket.send(json.dumps({'config': {'foo': 'bar'}}))
-        response = await test_websocket.receive()
+    client_room = app.test_client()
+    async with client_room.websocket('/ws_room') as ws_room:
+        await ws_room.send(json.dumps({'config': {'foo': 'bar'}}))
+        response = await ws_room.receive()
         response = json.loads(response)
         assert 'pin' in response
         assert 'timeout' in response
         assert type(response['pin']) == int
         assert type(response['timeout']) == int
-        await test_websocket.close(1000)
-        #raise RuntimeError("foo")
+        await ws_room.close(1000)
     await asyncio.sleep(0.01)
+
+@pytest.mark.asyncio
+@with_timeout(1)
+async def test_room_no_config():
+    client_room = app.test_client()
+    async with client_room.websocket('/ws_room') as ws_room:
+        await ws_room.send(json.dumps({}))
+        with pytest.raises(WebsocketDisconnectError):
+            response = await ws_room.receive()
+
+@pytest.mark.asyncio
+@with_timeout(1)
+async def test_room_no_json():
+    client_room = app.test_client()
+    async with client_room.websocket('/ws_room') as ws_room:
+        await ws_room.send(b'foobar')
+        with pytest.raises(WebsocketDisconnectError):
+            response = await ws_room.receive()
 
 @pytest.mark.asyncio
 @with_timeout(1)
