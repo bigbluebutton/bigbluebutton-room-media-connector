@@ -1,5 +1,4 @@
 import asyncio
-from async_timeout import timeout
 from quart import Quart, websocket, send_file, request
 import json
 import random
