@@ -58,5 +58,5 @@ pip install -r requirements-test.txt
 ```
 2. Execute tests
 ```bash
-pytest
+python -m pytest
 ```
