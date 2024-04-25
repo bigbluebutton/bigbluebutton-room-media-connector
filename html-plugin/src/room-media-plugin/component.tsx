@@ -16,6 +16,7 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
     const [showModal, setShowModal] = useState<boolean>(false);
     const pluginApi: PluginApi = BbbPluginSdk.getPluginApi(uuid);
     const {data: currentUser} = pluginApi.useCurrentUser();
+    const {data: pluginSettings} = pluginApi.usePluginSettings();
     const [inputValue, setInputValue] = useState('');
     const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
     const [filteredLayout, setFilteredLayouts] = useState<Layout | null>(null);
@@ -23,23 +24,6 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
     const [offerResponse, setOfferResponse] = useState<string | null>(null);
     const [pairingPin, setPairingPin] = useState<string | null>(null);
     const [roomJoinUrls, setRoomJoinUrls] = useState(null);
-    const [pluginConfig, setPluginConfig] = useState(null);
-    // const jsonExample: ResponseData = { "status": 200, "msg": "ok", "config": { "name": "HU Erwin Schr\u00f6dinger Zentrum 0101", "bbb_user_id": "asdfa", "bbb_user_name": "MediaSystem0101", "layouts": { "CHAT_LEFT_VIDEO_RIGHT": { "index": 0, "label": "Chat left, video right", "screens": { "left": { "bbb-join-parameters": { "enforceLayout": "participantsChatOnly", "userdata-bbb_display_notifications": false, "userdata-bbb_hide_nav_bar": true } }, "right": { "bbb-join-parameters": { "userdata-bbb_hide_actions_bar": true, "enforceLayout": "camerasOnly", "userdata-bbb_display_notifications": false, "userdata-bbb_auto_share_webcam": true, "userdata-bbb_listen_only_mode": false, "userdata-bbb_skip_check_audio": true, "userdata-bbb_skip_video_preview": true, "userdata-bbb_preferred_camera_profile": "high", "userdata-bbb_hide_nav_bar": true } } } }, "VIDEO_LEFT_PRESENTATION_RIGHT": { "index": 1, "label": "Video left, presentation right", "screens": { "left": { "bbb-join-parameters": { "userdata-bbb_hide_actions_bar": true, "enforceLayout": "camerasOnly", "userdata-bbb_display_notifications": false, "userdata-bbb_auto_share_webcam": true, "userdata-bbb_listen_only_mode": false, "userdata-bbb_skip_check_audio": true, "userdata-bbb_skip_video_preview": true, "userdata-bbb_preferred_camera_profile": "high", "userdata-bbb_hide_nav_bar": true } }, "right": { "bbb-join-parameters": { "userdata-bbb_self_view_disable": true, "enforceLayout": "presentationOnly", "userdata-bbb_display_notifications": false, "userdata-bbb_auto_share_webcam": true, "userdata-bbb_listen_only_mode": false, "userdata-bbb_skip_check_audio": true, "userdata-bbb_skip_video_preview": true, "userdata-bbb_hide_nav_bar": true, "userdata-bbb_hide_actions_bar": true } } } } } } };
-
-    // useEffect(() => {
-    //   const fetchData = async () => {
-    //     try {
-    //       const response = await fetch('./pluginConfig.json');
-    //       const configData = await response.json();
-    //       console.log("config:", configData)
-    //       setPluginConfig(configData);
-    //     } catch (error) {
-    //       console.error('Room Integration Plugin: Error fetching Config file:', error);
-    //     }
-    //   };
-
-    //   fetchData();
-    // }, []);
 
     const filterLayouts = (jsonData: ResponseData, index: number) => {
         const layoutsArray = Object.values(jsonData.config.layouts);
@@ -47,10 +31,16 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
         setFilteredLayouts(filteredLayout);
     }
 
-    const createWebSocket = () => {
-        // const ws = new WebSocket(pluginConfig.websocketUrl);
-        const ws = new WebSocket("wss://davis.hrz.tu-chemnitz.de/hybrid/ws");
+    console.log('Plugin settings:', pluginSettings);
 
+    const createWebSocket = () => {
+
+        if (!pluginSettings || typeof pluginSettings.pairingWebsocketUrl !== 'string') {
+            console.error('Plugin settings or pairingWebsocketUrl URL not yet available');
+            return;
+        }
+
+        const ws = new WebSocket(pluginSettings.pairingWebsocketUrl);
         ws.onopen = () => {
             // Send user input to WebSocket
             if (ws.readyState === WebSocket.OPEN) {
@@ -134,7 +124,6 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
                     role: "MODERATOR"
                 }
             );
-            // const controlJoinUrl: string = "https://bbb3-dev.virtuos.uni-osnabrueck.de/bigbluebutton/api/join?fullName=Room+Integration&meetingID=random-6478495&password=mp&redirect=true&userID=bbb-room-integration&checksum=eb5a8c0685e922356794224c683c792f5d68fb3f"
 
             const screenJoinUrls: { [key: string]: string } = {};
 
@@ -148,7 +137,6 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
                             role: 'MODERATOR'
                         };
                         screenJoinUrls[key] = await pluginApi.getJoinUrl(joinParametersMap);
-                        // screenJoinUrls[key] = "https://bbb3-dev.virtuos.uni-osnabrueck.de/bigbluebutton/api/join?fullName=Room+Integration&meetingID=random-6478495&password=ap&redirect=true&userID=bbb-room-integration&checksum=b058fca6202700005c36675332c6ed760e8e3578";
                     })
                 );
                 const roomJoinUrls = {
