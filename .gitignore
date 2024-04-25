@@ -10,3 +10,7 @@ appliance-application/packages/preload/dist
 appliance-application/packages/renderer/dist
 package-lock.json
 __pycache__
+
+env/
+test-env/
+venv/
