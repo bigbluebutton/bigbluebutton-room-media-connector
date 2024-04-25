@@ -1,5 +1,5 @@
 import asyncio
-from quart import Quart, websocket, send_file, request
+from quart import Quart, websocket
 import json
 import random
 import traceback
@@ -17,20 +17,16 @@ room_connections = AtomicInt()
 
 
 def validate_client_config(config) -> bool:
-    return True
-    if type(config) != list:
-        return False
-    for client in config:
-        if set(client.keys()) != set(['name', 'has_audio']):
-            return False
-    return True
+    return True  # Todo: see issue #4
+
 
 def generate_pin():
     while True:
-        pin = random.randrange(1e5, 1e6 - 1)
+        pin = random.randrange(1e5, 1e6 - 1)  # nosec: B311
         pin_free = pin not in pin_to_room
         if pin_free:
             return pin
+
 
 async def generate_pin_task(connection_id):
     print(f"pin task: started {connection_id}")
@@ -50,6 +46,7 @@ async def generate_pin_task(connection_id):
         traceback.print_exception(e)
         return
 
+
 @app.websocket('/ws_room')
 async def handle_room() -> None:
     pin_task = None
@@ -59,14 +56,15 @@ async def handle_room() -> None:
     try:
         data = await websocket.receive()
         data = json.loads(data)
-        if not 'config' in data:
+        if 'config' not in data:
             return
         config = data['config']
         connection_id = room_connections.inc()
         room_config[connection_id] = config
         print(f'room config: {connection_id} is {config}')
         to_room[connection_id] = asyncio.Queue()
-        pin_task = asyncio.create_task(generate_pin_task(connection_id), name=f"pin_generate_{connection_id}")
+        pin_task = asyncio.create_task(generate_pin_task(
+            connection_id), name=f"pin_generate_{connection_id}")
         while True:
             msg = await to_room[connection_id].get()
             print(f"room queue received {msg}")
@@ -76,15 +74,35 @@ async def handle_room() -> None:
                     del pin_to_room[last_pin]
                 last_pin = pin
                 pin_to_room[pin] = connection_id
-                await websocket.send(json.dumps({'action': 'new_pin', 'pin': pin, 'timeout': pin_rollover}))
+                await websocket.send(
+                    json.dumps(
+                        {
+                            'action': 'new_pin',
+                            'pin': pin,
+                            'timeout': pin_rollover
+                        }
+                    )
+                )
             elif 'start' in msg:
-                await websocket.send(json.dumps({'action': 'start', 'urls': msg['urls'], 'pairing_pin': msg['pairing_pin']}))
-                forward_task = asyncio.create_task(forward_from_queue_to_websocket(to_room[connection_id], websocket))
+                await websocket.send(
+                    json.dumps(
+                        {
+                            'action': 'start',
+                            'urls': msg['urls'],
+                            'pairing_pin': msg['pairing_pin']
+                        }
+                    )
+                )
+                forward_task = asyncio.create_task(
+                    forward_from_queue_to_websocket(
+                        to_room[connection_id], websocket)
+                )
             elif 'stop_pin_generation' in msg:
                 pin_task.cancel()
             elif 'start_pin_generation' in msg:
                 if pin_task is not None or pin_task.cancelled():
-                    pin_task = asyncio.create_task(generate_pin_task(connection_id), name=f"pin_generate_{connection_id}")
+                    pin_task = asyncio.create_task(generate_pin_task(connection_id),
+                                                   name=f"pin_generate_{connection_id}")
 
     finally:
         print("room close")
@@ -99,20 +117,20 @@ async def handle_room() -> None:
             del to_room[connection_id]
             del q
 
+
 @app.websocket('/ws')
 async def handle_ws() -> None:
     pin_generation_stopped = False
     # pin provided by bbb plugin
     pin = None
     # verification pin after conn established
-    pairing_pin = random.randrange(1e3, 1e4 - 1)
+    pairing_pin = random.randrange(1e3, 1e4 - 1)  # nosec: B311
     forward_task = None
     try:
         data = await websocket.receive_json()
-        #data = json.loads(data)
         print(f"plugin received {data}")
         pin = data['pin']
-        if not pin in pin_to_room:
+        if pin not in pin_to_room:
             await websocket.send(json.dumps({'status': 404, 'msg': 'PIN not found'}))
             return
         room_connection_id = pin_to_room[pin]
@@ -136,13 +154,14 @@ async def handle_ws() -> None:
         print("Warte auf URLS")
         data = await websocket.receive_json()
         print(f"empfangen: {data}")
-        if not 'urls' in data:
+        if 'urls' not in data:
             await websocket.send(json.dumps({'status': 500, 'msg': 'invalid format. Expecting urls'}))
             return
         to_plugin[pin] = asyncio.Queue()
         await to_room_queue.put({'start': True, 'urls': data['urls'], 'pairing_pin': pairing_pin})
         await websocket.send(json.dumps({'status': 200, 'msg': 'pairing', 'pairing_pin': pairing_pin}))
-        forward_task = asyncio.create_task(forward_from_queue_to_websocket(to_plugin[pin], websocket))
+        forward_task = asyncio.create_task(
+            forward_from_queue_to_websocket(to_plugin[pin], websocket))
         while True:
             data = await websocket.receive()
             data = json.loads(data)
@@ -169,6 +188,7 @@ async def handle_ws() -> None:
         await websocket.close(1007)
         print("closed plugin")
         return
+
 
 async def forward_from_queue_to_websocket(q, websocket):
     try:

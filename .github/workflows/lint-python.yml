@@ -1,0 +1,41 @@
+---
+name: lint-python
+
+on:
+  push:
+    branches-ignore:
+      - 'dependabot/**'
+  pull_request:
+
+defaults:
+  run:
+    working-directory: ./pairing-server
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # https://endoflife.date/python
+        # https://github.com/actions/runner-images/blob/main/images/linux/Ubuntu2204-Readme.md#python
+        python-version:
+          - '3.9'
+          - '3.10'
+          - '3.11'
+          - '3.12'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: set up python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - run: pip install -r requirements.txt
+
+    - run: pip install flake8 bandit
+
+    - run: flake8 *.py test --max-line-length=120
+
+    - run: bandit *.py
