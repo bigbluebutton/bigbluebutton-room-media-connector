@@ -31,14 +31,16 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
         setFilteredLayouts(filteredLayout);
     }
 
+    console.log('Plugin settings:', pluginSettings);
+
     const createWebSocket = () => {
 
-        if (!pluginSettings || typeof pluginSettings.websocketUrl !== 'string') {
-            console.error('Plugin settings or WebSocket URL not yet available');
+        if (!pluginSettings || typeof pluginSettings.pairingWebsocketUrl !== 'string') {
+            console.error('Plugin settings or pairingWebsocketUrl URL not yet available');
             return;
         }
 
-        const ws = new WebSocket(pluginSettings.websocketUrl);
+        const ws = new WebSocket(pluginSettings.pairingWebsocketUrl);
         ws.onopen = () => {
             // Send user input to WebSocket
             if (ws.readyState === WebSocket.OPEN) {
@@ -122,7 +124,7 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
                     role: "MODERATOR"
                 }
             );
-           
+
             const screenJoinUrls: { [key: string]: string } = {};
 
             try {
