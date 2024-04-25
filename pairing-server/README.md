@@ -56,6 +56,7 @@ Install the test dependencies in a virtual environment:
 ```bash
 python3 -m venv test-env
 . test-env/bin/activate
+pip install -r requirements.txt
 pip install -r requirements-test.txt
 ```
 
