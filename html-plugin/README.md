@@ -3,48 +3,63 @@
 
 ## What is it?
 
-This plugin communicates with the pairing server sending the user provided pin and receives the room layout config provided by the appliance application.
-It then creates the required join urls and passes it to the appliance application.
+This is a [BBB HTML plugin](https://github.com/bigbluebutton/bigbluebutton-html-plugin-sdk) where the user can enter the PIN displayed by the [room appliance application](../appliance-application/).
+It then checks this PIN with the [pairing-server](../pairing-server/) and afterwards creates the join-URLs for the applicance application.
 To finish the pairing it shows the pairing pin for user confirmation.
 
-## Running the Plugin from Source
+## Usage
+
+This is a general instruction on how to use a plugin.
+For a detailed configuration example of each use case,
+have a look at the READMEs in the respective [samples](samples)-folders.
+
+### Running the Plugin from Source
+
+For development purposes you can run the plugin locally from source:
 
 1. Start the development server:
+    ```bash
+    cd $HOME/src/bigbluebutton-html-plugin-sdk/samples/sample-action-button-dropdown-plugin
+    npm install
+    npm start
+    ```
+
+2. Configure it in the `settings.yml` of the BBB HTML5 Client:
+    ```yaml
+    public:
+      plugins:
+        - name: RoomMediaPlugin
+          url: http://127.0.0.1:4701/static/RoomMediaPlugin.js
+    ```
+
+_N.B.:_ Be aware that in this case the url is interpreted from the plugin in the browser,
+so the localhost is actually your local development machine.
+
+### Building the Plugin
+
+To build the plugin for deployment follow these steps:
 
 ```bash
-npm install
-npm start
-```
-
-2. Add reference to it on BigBlueButton's `settings.yml`:
-
-```yaml
-  plugins:
-    - name: RoomMediaPlugin
-      url: http://127.0.0.1:4701/static/RoomMediaPlugin.js
-```
-
-## Building the Plugin
-
-To build the plugin for production use, follow these steps:
-
-```bash
+cd $HOME/html-plugin
 npm install
 npm run build-bundle
 ```
 
-The above command will generate the `dist` folder, containing the bundled JavaScript file named `RoomMediaPlugin.js`. This file can be hosted on any HTTPS server.
+The above command will generate the `dist` folder, containing the bundled JavaScript file named `RoomMediaPlugin.js`.
+This file can be hosted on any HTTPS server.
 
-To use the plugin with BigBlueButton, add the plugin's URL to `settings.yml` as shown below:
+To use the plugin with BigBlueButton, add the plugin's URL to the `settings.yml` of the BBB HTML5 Client as shown below:
 
 ```yaml
 public:
-  app:
-    ... // All app configurations
   plugins:
     - name: RoomMediaPlugin
       url: <<PLUGIN_URL>>
-  ... // All other configurations
 ```
 
-Alternatively, you can host the bundled file on the BigBlueButton server by copying `dist/RoomMediaPlugin.js` to the folder `/var/www/bigbluebutton-default/assets/plugins`. In this case, the `<<PLUGIN_URL>>` will be `https://<your-host>/plugins/RoomMediaPlugin.js`.
+#### Hosting the Plugin on a BBB Server
+
+While the plugin can be hosted on any Server, it is also possible to host the bundled file directly on
+a BigBlueButton server.
+For that you copy the `dist/RoomMediaPlugin.js` to the folder `/var/www/bigbluebutton-default/assets/plugins`.
+In this case, the `<<PLUGIN_URL>>` above will be `https://<your-host>/plugins/RoomMediaPlugin.js`.

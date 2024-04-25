@@ -12,6 +12,14 @@ It also improves the experience for the in-site audience,
 by displaying the most relevant content, given the available
 displays.
 
+## Prerequisites
+
+This application needs to be run on a device (e.g. Intel NUC) inside the meeting room that
+itself can be connected to the room's audiovisual input and output devices.
+
+Currently as additional hardware an Elgato Streamdeck is required as input device if you
+want to control the meeting from the appliance.
+
 ## Running the application in development mode
 
 1. Copy config file:
@@ -25,7 +33,7 @@ Place the settings config file `settings.json` in the following folder:
 
 2. Customize the config file:
 
-- You have to adjust the `control_server.ws` setting to point to the location of the pairing server.
+- You have to adjust the `control_server.ws` setting to point to the `/ws_room` route of the pairing server (e.g. `https://your-bbb-server.org/hybrid/ws_room` if you follow the [instructions](../pairing-server/) and install the pairing server on a bbb host).
 - Next `room.name` should be set to the name of the room that should be shown during the pairing process.
 - You can also set `preferred_pin_screen` to the name of the screen that should be used to display the pairing pin. If the screen it not found, it uses the first screen it finds.
 - Lastly you need to define the layouts, a few examples are provided in `room.layouts`.
