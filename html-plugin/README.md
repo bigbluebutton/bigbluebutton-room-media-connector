@@ -30,6 +30,8 @@ For development purposes you can run the plugin locally from source:
       plugins:
         - name: RoomMediaPlugin
           url: http://127.0.0.1:4701/static/RoomMediaPlugin.js
+          settings:
+            pairingWebsocketUrl: wss://your-bbb-server.org/hybrid/ws
     ```
 
 _N.B.:_ Be aware that in this case the url is interpreted from the plugin in the browser,
@@ -55,6 +57,8 @@ public:
   plugins:
     - name: RoomMediaPlugin
       url: <<PLUGIN_URL>>
+      settings:
+        pairingWebsocketUrl: wss://your-bbb-server.org/hybrid/ws
 ```
 
 #### Hosting the Plugin on a BBB Server

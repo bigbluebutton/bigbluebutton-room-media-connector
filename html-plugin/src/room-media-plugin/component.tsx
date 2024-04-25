@@ -122,8 +122,7 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
                     role: "MODERATOR"
                 }
             );
-            // const controlJoinUrl: string = "https://bbb3-dev.virtuos.uni-osnabrueck.de/bigbluebutton/api/join?fullName=Room+Integration&meetingID=random-6478495&password=mp&redirect=true&userID=bbb-room-integration&checksum=eb5a8c0685e922356794224c683c792f5d68fb3f"
-
+           
             const screenJoinUrls: { [key: string]: string } = {};
 
             try {
@@ -136,7 +135,6 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
                             role: 'MODERATOR'
                         };
                         screenJoinUrls[key] = await pluginApi.getJoinUrl(joinParametersMap);
-                        // screenJoinUrls[key] = "https://bbb3-dev.virtuos.uni-osnabrueck.de/bigbluebutton/api/join?fullName=Room+Integration&meetingID=random-6478495&password=ap&redirect=true&userID=bbb-room-integration&checksum=b058fca6202700005c36675332c6ed760e8e3578";
                     })
                 );
                 const roomJoinUrls = {
