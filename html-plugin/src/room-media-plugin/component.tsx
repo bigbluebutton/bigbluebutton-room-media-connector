@@ -46,7 +46,7 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
             if (ws.readyState === WebSocket.OPEN) {
                 try {
                     const data = {
-                        pin: inputValue,
+                        pin: Number(inputValue),
                     };
                     ws.send(JSON.stringify(data));
                 } catch (error) {
