@@ -1,7 +1,7 @@
 import asyncio
 from quart import Quart, websocket
 import json
-import random
+import secrets
 import traceback
 from atomicx import AtomicInt
 
@@ -22,7 +22,7 @@ def validate_client_config(config) -> bool:
 
 def generate_pin():
     while True:
-        pin = random.randrange(1e5, 1e6 - 1)  # nosec: B311
+        pin = secrets.randbelow(int(1e6 - 1e5)) + int(1e5)
         pin_free = pin not in pin_to_room
         if pin_free:
             return pin
@@ -124,7 +124,7 @@ async def handle_ws() -> None:
     # pin provided by bbb plugin
     pin = None
     # verification pin after conn established
-    pairing_pin = random.randrange(1e3, 1e4 - 1)  # nosec: B311
+    pairing_pin = secrets.randbelow(int(1e6 - 1e5)) + int(1e5)
     forward_task = None
     try:
         data = await websocket.receive_json()
