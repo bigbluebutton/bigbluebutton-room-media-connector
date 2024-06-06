@@ -36,8 +36,8 @@ jobs:
 
     - run: pip install -r requirements-test.txt
 
-    - run: flake8 *.py test --max-line-length=120
+    - run: flake8 bbb_pairing_server test --max-line-length=120
 
-    - run: bandit *.py
+    - run: bandit bbb_pairing_server
 
     - run: python -m pytest
