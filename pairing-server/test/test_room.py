@@ -3,7 +3,7 @@ import pytest
 from async_timeout import timeout
 from quart.testing.connections import WebsocketDisconnectError
 
-from app import app
+from bbb_pairing_server.app import app
 import json
 
 
