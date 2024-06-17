@@ -1,2 +1,4 @@
-pytest-asyncio
 async_timeout
+bandit
+flake8
+pytest-asyncio

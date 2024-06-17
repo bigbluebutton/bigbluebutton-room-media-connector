@@ -1,0 +1,29 @@
+[build-system]
+requires = ['setuptools >= 61.0', 'wheel']
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = 'bbb_pairing_server'
+version = '0.0.1'
+authors = [
+    {name = 'Daniel Schreiber'},
+    {name = 'Timo Nogueira Brockmeyer', email = 'timo.nogueira.brockmeyer@uni-osnabrueck.de'}
+]
+description = 'Pairing Server to connect BBB Meetings with a room media appliance'
+readme = {file = 'README.md', content-type = 'text/markdown'}
+requires-python = ">=3.9"
+license = {file = 'LICENSE'}
+dependencies = [
+    'quart',
+    'atomicx'
+]
+
+[project.urls]
+"Homepage" = "https://github.com/bigbluebutton/bigbluebutton-room-media-connector"
+"Documentation" = "https://github.com/bigbluebutton/bigbluebutton-room-media-connector"
+
+[project.scripts]
+bbb_pairing_server = 'bbb_pairing_server.app:run'
+
+[tool.setuptools]
+packages = ['bbb_pairing_server']
