@@ -1,6 +1,10 @@
 html-plugin/.idea
 html-plugin/dist
 html-plugin/node_modules
+html-plugin/debian/bbb-room-connector-plugin/
+html-plugin/debian/bbb-room-connector-plugin.substvars
+html-plugin/debian/files
+html-plugin/debian/debhelper-build-stamp
 .DS_Store
 appliance-application/dist
 appliance-application/node_modules
@@ -35,3 +39,4 @@ venv/
 
 __pycache__
 .pytest_cache/
+

@@ -3,6 +3,8 @@ name: Publish the pairing server 📦 to PyPI and TestPyPI
 
 on:
   push:
+    paths:
+        - 'pairing-server/**'
 
 defaults:
   run:
