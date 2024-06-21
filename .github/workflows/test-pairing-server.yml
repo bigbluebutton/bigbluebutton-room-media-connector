@@ -5,7 +5,11 @@ on:
   push:
     branches-ignore:
       - 'dependabot/**'
+    paths:
+        - 'pairing-server/**'
   pull_request:
+    paths:
+        - 'pairing-server/**'
 
 defaults:
   run:

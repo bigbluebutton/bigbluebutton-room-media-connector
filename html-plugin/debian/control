@@ -1,0 +1,13 @@
+Source: bbb-room-connector-plugin
+Section: web
+Priority: extra
+Maintainer: Timo Nogueira Brockmeyer <timb@uos.de>
+Build-Depends: debhelper (>= 13), nodejs (>= 18)
+Standards-Version: 4.1.4
+
+Package: bbb-room-connector-plugin
+Architecture: all
+Depends: ${misc:Depends}, nodejs
+Description: The BigBlueButton room connector plugin
+ A BigBlueButton plugin to connect a meeting to a room appliance
+ (as a bring-your-own-meeting functionality).
