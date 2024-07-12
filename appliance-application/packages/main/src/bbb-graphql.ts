@@ -97,8 +97,8 @@ export class BBBGraphql{
     await this.initApolloClient();
 
     const JOIN_MUTATION = gql`
-      mutation UserJoin($authToken: String!, $clientType: String!) {
-        userJoin(
+      mutation UserJoinMeeting($authToken: String!, $clientType: String!) {
+        userJoinMeeting(
           authToken: $authToken,
           clientType: $clientType,
         )
@@ -114,8 +114,8 @@ export class BBBGraphql{
       },
     });
 
-    if(!result.data.userJoin){
-      console.log('userJoin failed');
+    if(!result.data.userJoinMeeting){
+      console.log('userJoinMeeting failed');
       return false;
     }
 
