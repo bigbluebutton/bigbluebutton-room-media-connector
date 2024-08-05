@@ -1,0 +1,60 @@
+---
+name: 📦 Build .deb-package for html-plugin
+on:
+  push:
+    branches: [ "main"]
+    paths:
+      - 'html-plugin/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'html-plugin/**'
+
+jobs:
+  build-deb-package:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: ./html-plugin
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: sudo ./.setup-build-dependencies.sh
+
+      - run: node --version
+
+      - name: Build Debian package
+        run: sudo dpkg-buildpackage -us -uc
+
+      - name: Upload Debian Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: html-plugin-ubuntu-22.04
+          path: "${{ github.workspace }}/*.deb"
+
+  release:
+    name: "Upload assets to release"
+    needs: build-deb-package
+    runs-on: ubuntu-latest
+    if: ${{ github.ref_type == 'tag' }}
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: html-plugin-ubuntu-22.04
+          path: html-plugin-ubuntu-22.04
+
+      - name: Create release asset archives
+        run: zip --junk-paths --recurse-paths --compression-method store "html-plugin-ubuntu-22.04.zip" "html-plugin-ubuntu-22.04"
+
+      - name: Upload release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ github.ref_name }} "html-plugin-ubuntu-22.04.zip"

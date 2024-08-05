@@ -2,17 +2,9 @@ import { BrowserWindow} from 'electron';
 import {app, screen} from 'electron';
 import Display = Electron.Display;
 import type {ApolloClient, NormalizedCacheObject} from '@apollo/client/core';
-import { InMemoryCache, gql} from '@apollo/client/core';
-import axios from 'axios';
-import { SubscriptionClient } from 'subscriptions-transport-ws';
-import { WebSocketLink } from '@apollo/client/link/ws';
-import { ProxyWebsocket } from './ProxyWebsocket';
+import { gql } from '@apollo/client/core';
 import {BBBGraphql} from '/@/bbb-graphql';
-import {join} from 'node:path';
 import {DisplayManager} from "/@/displayManager";
-
-global.WebSocket = ProxyWebsocket;
-
 
 export class BBBMeeting{
 

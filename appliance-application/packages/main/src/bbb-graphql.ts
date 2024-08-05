@@ -1,109 +1,145 @@
-import type { NormalizedCacheObject} from '@apollo/client/core';
-import {ApolloClient, InMemoryCache, gql} from '@apollo/client/core';
 import axios from 'axios';
-import { SubscriptionClient } from 'subscriptions-transport-ws';
-import { WebSocketLink } from '@apollo/client/link/ws';
-import { ProxyWebsocket } from './ProxyWebsocket';
+import {createClient} from 'graphql-ws';
+import WebSocket from 'ws'
+import {
+  ApolloClient,
+  InMemoryCache,
+  ApolloLink,
+  gql,
+  NormalizedCacheObject,
+} from '@apollo/client/core';
+import {GraphQLWsLink} from '@apollo/client/link/subscriptions';
 
-global.WebSocket = ProxyWebsocket;
+interface UserCurrentData {
+  user_current: {
+    authToken: string;
+  }[];
+}
 
-
-export class BBBGraphql{
-
+export class BBBGraphql {
   private joinUrl: string;
-  private cookies: string[];
-  private sessionToken: string;
-  private host: string;
-  private authToken: string;
-  private apolloClient: ApolloClient<NormalizedCacheObject>;
-  private userId: string | null;
-  private subscriptionClient: SubscriptionClient;
+  private cookies: string[] | undefined = undefined;
+  private sessionToken: string | null = null;
+  private host: string = '';
+  private authToken: string = '';
+  private apolloClient: ApolloClient<NormalizedCacheObject> | undefined;
+  private userId: string | null = null;
 
-  constructor(joinUrl: string) {
+  constructor (joinUrl: string) {
     this.joinUrl = joinUrl;
   }
 
-  public async connect() {
-
-    if(!await this.requestSessionToken()){
-      console.log('requestSessionToken failed');
+  public async connect () {
+    if (!(await this.requestSessionToken())) {
+      console.error('Failed to request session token.');
       return false;
     }
 
-    if(!await this.enterMeeting()){
-      console.log('enterMeeting failed');
+    if (!(await this.initApolloClient())) {
+      console.error('Failed to initialize Apollo Client.');
       return false;
     }
 
-    if(!await this.connectToGraphQL()){
-      console.log('connectToGraphQL failed');
+    if (!(await this.getAuthToken())) {
+      console.error('Failed to retrieve the authToken.');
+      return false;
+    }
+
+    if (!(await this.connectToGraphQL())) {
+      console.error('Failed to connect to GraphQL.');
       return false;
     }
 
     return true;
   }
 
-  private async requestSessionToken() {
+  private async requestSessionToken (): Promise<boolean> {
     try {
-      console.log('requestSessionToken', this.joinUrl);
-
+      console.debug('Join link used:', this.joinUrl);
       const joinUrl = new URL(this.joinUrl);
 
       this.userId = joinUrl.searchParams.get('userID');
+      console.debug('userId: ', this.userId);
 
-      const response = await axios.get(this.joinUrl, { withCredentials: true, maxRedirects: 0, validateStatus: function (status) {
+      const response = await axios.get(this.joinUrl, {
+        withCredentials: true,
+        maxRedirects: 0,
+        validateStatus: function (status) {
           return status == 200 || status == 302;
-        } });
+        },
+      });
       if (response.status === 302) {
-
-        const redirectUrl =  response.headers['location'];
-        console.log('redirectUrl', redirectUrl);
+        const redirectUrl = response.headers['location'];
+        console.debug('redirectUrl', redirectUrl);
         const url = new URL(redirectUrl);
-
 
         this.sessionToken = url.searchParams.get('sessionToken');
         this.host = url.host;
         this.cookies = response.headers['set-cookie'];
+        console.debug('cookies', this.cookies);
 
         return true;
       }
-    }
-    catch (e) {
-      console.log(e);
+    } catch (error) {
+      console.error(error);
     }
 
     return false;
   }
 
-  private async enterMeeting() {
+  private async getAuthToken():  Promise<boolean> {
 
-    try {
-      const response = await axios.get(`https://${this.host}/bigbluebutton/api/enter?sessionToken=${this.sessionToken}`, { withCredentials: true , headers: { Cookie: this.cookies }});
-      if (response.status === 200) {
-        this.authToken = response.data.response.authToken;
-
-        return true;
-      }
+    if (!(this?.apolloClient)) {
+      return false;
     }
-    catch (e) {
-      console.log(e);
+    const USER_CURRENT_QUERY = gql`
+      query getUserCurrent {
+        user_current {
+          authToken
+        }
+      }
+    `;
+
+    const { data } = await this.apolloClient.query(
+      {
+        query: USER_CURRENT_QUERY,
+        fetchPolicy: 'network-only',
+      }
+    );
+
+    if (data && data?.user_current?.[0]?.authToken) {
+      console.log('IN getAuthToken: ', data);
+      this.authToken = data.user_current[0].authToken;
+      return true;
     }
 
     return false;
   }
 
-  public async connectToGraphQL() {
-
+  public async connectToGraphQL () {
     await this.initApolloClient();
 
+    console.debug('--- Connecting to GraphQL... ---');
+
     const JOIN_MUTATION = gql`
-      mutation UserJoin($authToken: String!, $clientType: String!) {
-        userJoin(
-          authToken: $authToken,
-          clientType: $clientType,
+      mutation UserJoin($authToken: String!, $clientType: String!, $clientIsMobile: Boolean!) {
+        userJoinMeeting(
+          authToken: $authToken
+          clientType: $clientType
+          clientIsMobile: $clientIsMobile
         )
       }
     `;
+
+    if (!this.authToken) {
+      console.error('authToken is not set.');
+      return false;
+    }
+
+    if (!(this?.apolloClient)) {
+      console.error('apolloClient is not set.');
+      return false;
+    }
 
     // Execute the mutation
     const result = await this.apolloClient.mutate({
@@ -111,11 +147,15 @@ export class BBBGraphql{
       variables: {
         authToken: this.authToken,
         clientType: 'html5',
+        clientIsMobile: false,
       },
     });
 
-    if(!result.data.userJoin){
-      console.log('userJoin failed');
+    // Check the result
+    console.debug('userJoin result:', result);
+
+    if (!result.data.userJoinMeeting) {
+      console.log('userJoinMeeting failed');
       return false;
     }
 
@@ -125,87 +165,104 @@ export class BBBGraphql{
     return true;
   }
 
-  private async initApolloClient(debug: boolean = false) {
+  private async initApolloClient (): Promise<boolean> {
+    let wsLink;
+    try {
+      // Check if cookies are not null before attempting to find a cookie
+      if (!this.cookies) {
+        console.error('Cookies are not set.');
+        return false;
+      }
 
-    const jSessionCookie = this.cookies.find((cookie) => {
-      return cookie.startsWith('JSESSIONID');
-    }).split(';')[0];
+      const jSessionCookie = this.cookies
+        ?.find(cookie => cookie.startsWith('JSESSIONID'))
+        ?.split(';')[0];
+      console.debug('jSessionCookie', jSessionCookie);
 
-    let promiseResolve, promiseReject;
-
-    const connectionReady = new Promise((resolve, reject) => {
-      promiseResolve = resolve;
-      promiseReject = reject;
-    });
-
-    this.subscriptionClient = new SubscriptionClient(`wss://${this.host}/v1/graphql`, {
-      reconnect: true,
-      timeout: 30000,
-      connectionParams: {
-        headers: {
-          'X-Session-Token': this.sessionToken,
-          Cookie: jSessionCookie,
-        },
-      },
-      connectionCallback: (error, result) => {
-        if (error) {
-          promiseReject(error);
-        } else {
-          promiseResolve(result);
+      // You need to override the WebSocket class to add the cookie
+      class WebSocketWithCookie extends WebSocket {
+        constructor (address: string, protocols?: string | string[]) {
+          super(address, protocols, {
+            headers: {
+              Cookie: jSessionCookie,
+            },
+          });
         }
-      },
-    }, ProxyWebsocket);
+      }
 
-    if(debug){
-      this.debugSubscription();
+      const graphQlClient = createClient({
+        url: `wss://${this.host}/graphql`,
+        keepAlive: 10000,
+        webSocketImpl: WebSocketWithCookie, // Pass the custom WebSocket class
+        connectionParams: {
+          headers: {
+            'X-Session-Token': this.sessionToken,
+            'X-ClientSessionUUID': '1234',
+            'X-ClientType': 'HTML5',
+            'X-ClientIsMobile': 'false',
+          },
+        },
+        shouldRetry: (error: any) => {
+          if (error.code === 4403) {
+            console.error('GraphQL-Client: Session token is invalid');
+            return false;
+          }
+          return true;
+        },
+        on: {
+          error: error => {
+            console.error(`GraphQL-Client: Error: on subscription to server: ${error}`);
+          },
+          closed: () => {
+            console.info('GraphQL-Client: Connection closed');
+          },
+          connected: socket => {
+            console.info('GraphQL-Client: Connected to server');
+          },
+          connecting: () => {
+            console.info('GraphQL-Client: Connecting to server');
+          },
+          message: message => {
+            console.info('GraphQL-Client: Received message:', message);
+          },
+        },
+      });
+
+      console.debug('graphQlClient: ', graphQlClient);
+      const graphqlWsLink = new GraphQLWsLink(graphQlClient);
+      wsLink = ApolloLink.from([graphqlWsLink]);
+      wsLink.setOnError(error => {
+        throw new Error('Error: on apollo connection'.concat(JSON.stringify(error) || ''));
+      });
+    } catch (error) {
+      console.error('Error creating WebSocketLink: ', error);
+      return false;
     }
-
-    const link = new WebSocketLink(this.subscriptionClient);
-
-    const apolloClient = new ApolloClient({link, cache: new InMemoryCache()});
-
-    await connectionReady;
-
-    this.apolloClient = apolloClient;
+    try {
+      this.apolloClient = new ApolloClient({
+        link: wsLink,
+        cache: new InMemoryCache(),
+        connectToDevTools: true,
+      });
+    } catch (error) {
+      console.error('Error creating Apollo Client: ', error);
+      return false;
+    }
+    return true;
   }
 
-  public getApolloClient(){
+  public getApolloClient () {
     return this.apolloClient;
   }
 
-  public getUserId(){
+  public getUserId () {
     return this.userId;
   }
 
-  private debugSubscription(){
-    this.subscriptionClient.onConnecting(() => {
-      console.log('client connecting');
-    });
-
-    this.subscriptionClient.onConnected(() => {
-      console.log('client connected');
-    });
-
-    this.subscriptionClient.onReconnecting(() => {
-      console.log('client reconnecting');
-    });
-
-    this.subscriptionClient.onReconnected(() => {
-      console.log('client reconnected');
-    });
-
-    this.subscriptionClient.onDisconnected(() => {
-      console.log('client disconnected');
-    });
-
-    this.subscriptionClient.onError((error) => {
-      console.log('client error', error);
-    });
-  }
-
-  public async leaveMeeting() {
-    await this.apolloClient.clearStore();
-    this.apolloClient.stop();
-    this.subscriptionClient.close();
+  public async leaveMeeting () {
+    if (this?.apolloClient) {
+      await this.apolloClient.clearStore();
+      this.apolloClient.stop();
+    }
   }
 }

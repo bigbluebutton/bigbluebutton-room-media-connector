@@ -1,7 +1,7 @@
-import {app, systemPreferences, protocol} from 'electron';
+import {app} from 'electron';
 import './security-restrictions';
 import {restoreOrCreateWindow, hdiDevices } from '/@/mainWindow';
-import {openStreamDeck} from '@elgato-stream-deck/node';
+import {listStreamDecks, openStreamDeck} from '@elgato-stream-deck/node';
 import {StreamDeckHID} from '/@/streamdeck';
 
 
@@ -51,7 +51,10 @@ app
     console.log('App is ready');
 
     try {
-      const myStreamDeck = await openStreamDeck();
+      const allStreamDecks = await listStreamDecks();
+      console.debug('All Streamdecks found: ', allStreamDecks);
+      const myStreamDeck = await openStreamDeck(allStreamDecks[0].path);
+      console.debug('Streamdeck found: ', myStreamDeck);
       hdiDevices.push(new StreamDeckHID(myStreamDeck));
     } catch (e) {
       console.error(e);

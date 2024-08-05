@@ -1,8 +1,6 @@
 import {app, BrowserWindow, ipcMain, screen, session} from 'electron';
 import {join, resolve} from 'node:path';
-import {openStreamDeck} from '@elgato-stream-deck/node';
 import fs from 'fs';
-import {StreamDeckHID} from '/@/streamdeck';
 import {HID} from '/@/HID';
 import {BBBMeeting} from '/@/bbb-meeting';
 import {fileURLToPath} from "url";
