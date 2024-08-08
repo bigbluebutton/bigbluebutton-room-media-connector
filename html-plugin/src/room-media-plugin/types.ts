@@ -38,3 +38,30 @@ type ResponseData = {
 };
 
 export { LayoutScreen, Layout, Config, ResponseData };
+
+interface PinComponentProps {
+    performCompletion(value: string, index: number): void,
+    hasError: boolean
+}
+export { PinComponentProps };
+
+
+interface LoaderComponentProps {
+    title: string
+}
+export { LoaderComponentProps };
+
+
+interface LayoutComponentProps {
+    layouts: Layout[],
+    prepareSelection(index: number): void,
+}
+export { LayoutComponentProps };
+
+interface ConfirmationComponentProps {
+    title?: string,
+    text: string,
+    confirm(): void,
+    cancel(): void
+}
+export { ConfirmationComponentProps };
