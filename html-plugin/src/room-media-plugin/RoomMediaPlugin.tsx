@@ -128,6 +128,9 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
     useEffect(() => {
         if (offerResponse === 'accept') {
             setStatus('accepted');
+            setTimeout(() => {
+                setStatus('layoutSelection');
+                }, 500);
         }
     }, [offerResponse]);
 
@@ -238,9 +241,9 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
                     "urls": {"control": controlJoinUrl, "screens": screenJoinUrls}
                 };
                 setRoomJoinUrls(roomJoinUrls);
-                console.log("Room Join URLs: ", roomJoinUrls)
+                console.log("Hybrid-Plugin --- Room Join URLs: ", roomJoinUrls)
             } catch (error) {
-                console.error("Room Integration Plugin: Error fetching join URLs:", error);
+                console.error("Hybrid-Plugin --- Room Integration Plugin: Error fetching join URLs:", error);
             }
         };
 
