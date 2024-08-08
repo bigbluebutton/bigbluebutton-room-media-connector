@@ -51,17 +51,16 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
         setFilteredLayout(filteredLayout);
     }
 
-    // console.log('Plugin settings:', pluginSettings);
-
     const createWebSocket = () => {
 
         if (!pluginSettings || typeof pluginSettings.pairingWebsocketUrl !== 'string') {
-            console.error('Plugin settings or pairingWebsocketUrl URL not yet available');
+            console.error('Hybrid-Plugin --- Plugin settings or pairingWebsocketUrl URL not yet available');
             return;
         }
 
         const ws = new WebSocket(pluginSettings.pairingWebsocketUrl);
         ws.onopen = () => {
+            console.debug('Hybrid-Plugin --- WebSocket connection opened to:', pluginSettings.pairingWebsocketUrl);
             // Send user input to WebSocket
             if (ws.readyState === WebSocket.OPEN) {
                 try {
@@ -70,16 +69,15 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
                     };
                     ws.send(JSON.stringify(data));
                 } catch (error) {
-                    console.error('Room Integration Plugin: Error sending data via WebSocket:', error);
+                    console.error('Hybrid-Plugin --- Error sending data via WebSocket:', error);
                 }
             }
         };
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            console.log('websocket onmessage: ', data);
+            console.debug('Hybrid-Plugin --- websocket onmessage: ', data);
             if (data.status === 200 && data.msg === 'ok') {
-                console.log('data', data);
                 setRoomConfig(data.config);
                 extractFilterLayouts(data, 0);
                 resetPinValues();
@@ -96,7 +94,7 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
         };
 
         ws.onclose = (e) => {
-            console.log('Room Integration Plugin: WebSocket connection closed', e);
+            console.info('Hybrid-Plugin --- Room Integration Plugin: WebSocket connection closed', e);
             setPinError(true);
             setIsPairing(false);
         };
@@ -241,7 +239,7 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
                     "urls": {"control": controlJoinUrl, "screens": screenJoinUrls}
                 };
                 setRoomJoinUrls(roomJoinUrls);
-                console.log("Hybrid-Plugin --- Room Join URLs: ", roomJoinUrls)
+                console.info("Hybrid-Plugin --- Room Join URLs: ", roomJoinUrls)
             } catch (error) {
                 console.error("Hybrid-Plugin --- Room Integration Plugin: Error fetching join URLs:", error);
             }
@@ -256,7 +254,7 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
                 webSocket.send(JSON.stringify(roomJoinUrls));
             }
         } catch (error) {
-            console.error('Room Integration Plugin: Error sending urls via WebSocket:', error);
+            console.error('Hybrid-Plugin --- Room Integration Plugin: Error sending urls via WebSocket:', error);
         }
     }, [webSocket, roomJoinUrls]);
 

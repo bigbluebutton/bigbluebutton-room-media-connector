@@ -20,7 +20,7 @@ export const pluginApolloClient = async (joinUrl: string, sessionToken: string):
     let graphqlClient: any;
     const pathSplit = joinUrl.split('/join?');
     if (pathSplit?.length == 0) {
-        throw new Error('Failed to match BBB join URI');
+        throw new Error('Hybrid-Plugin --- Failed to match BBB join URI');
     }
     const hostUrl = pathSplit[0];
 
@@ -35,13 +35,13 @@ export const pluginApolloClient = async (joinUrl: string, sessionToken: string):
     }
 
     if (graphqlWebsocketUrl === '') {
-        throw new Error('Failed to fetch graphql websocket url');
+        throw new Error('Hybrid-Plugin --- Failed to fetch graphql websocket url');
     }
 
     const clientSessionUUID = sessionStorage.getItem('clientSessionUUID');
 
     if (!clientSessionUUID) {
-        throw new Error('Failed to get client session uuid');
+        throw new Error('Hybrid-Plugin --- Failed to get client session uuid');
     }
 
     try {
@@ -59,19 +59,19 @@ export const pluginApolloClient = async (joinUrl: string, sessionToken: string):
             },
             on: {
                 error: error => {
-                    console.error(`Error: on subscription to server: ${error}`);
+                    console.error(`Hybrid-Plugin --- Error: on subscription to server: ${error}`);
                 },
                 closed: () => {
-                    console.log('Connection closed')
+                    console.info('Hybrid-Plugin --- Connection closed')
                 },
                 connected: socket => {
-                    console.log('Connected to server')
+                    console.info('Hybrid-Plugin --- Connected to server')
                 },
                 connecting: () => {
-                    console.log('Connecting to server')
+                    console.info('Hybrid-Plugin --- Connecting to server')
                 },
                 message: message => {
-                    console.log('Received message:', message)
+                    console.info('Hybrid-Plugin --- Received message:', message)
                 },
             }
         });
@@ -81,10 +81,10 @@ export const pluginApolloClient = async (joinUrl: string, sessionToken: string):
         wsLink = ApolloLink.from([graphqlWsLink]);
 
         wsLink.setOnError(error => {
-            throw new Error('Error: on apollo connection'.concat(JSON.stringify(error) || ''));
+            throw new Error('Hybrid-Plugin --- Error: on apollo connection'.concat(JSON.stringify(error) || ''));
         });
     } catch (error) {
-        throw new Error('Failed to build apollo client:' + error);
+        throw new Error('Hybrid-Plugin --- Failed to build apollo client:' + error);
     }
 
     try {
@@ -96,10 +96,10 @@ export const pluginApolloClient = async (joinUrl: string, sessionToken: string):
 
         return graphqlClient;
     } catch (error) {
-        console.error('Error creating Apollo Client: ', error);
+        console.error('Hybrid-Plugin --- Error creating Apollo Client: ', error);
     }
 
-    throw new Error('Unable to create Apollo Client!');
+    throw new Error('Hybrid-Plugin --- Unable to create Apollo Client!');
 }
 
 export default { pluginApolloClient };
