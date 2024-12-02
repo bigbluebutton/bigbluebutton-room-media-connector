@@ -27,7 +27,7 @@ jobs:
       - name: Install Node.js and NPM
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 16.x
 
       - name: Install system dependencies on Ubuntu
         if: matrix.os == 'ubuntu-latest'
