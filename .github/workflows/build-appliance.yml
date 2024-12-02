@@ -29,9 +29,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        working-directory: appliance-application
+
 
       - name: Build
         run: npm run compile
+        working-directory: appliance-application
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
