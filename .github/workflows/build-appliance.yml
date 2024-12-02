@@ -33,7 +33,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt -y update
-          sudo apt install -y g++-12
+          sudo apt install -y g++-12 libusb-1.0-0-dev
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100
 
       - name: Install dependencies
