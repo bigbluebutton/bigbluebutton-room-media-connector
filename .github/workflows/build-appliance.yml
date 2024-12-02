@@ -1,0 +1,39 @@
+---
+name: 📦 Build Appliance electon app
+on:
+  push:
+    branches: [ "main"]
+    paths:
+      - 'appliance-application/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'appliance-application/**'
+
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js and NPM
+        uses: actions/setup-node@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run compile
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+            name: appliance-application-${{ matrix.os }}
+            path: appliance-application/dist
