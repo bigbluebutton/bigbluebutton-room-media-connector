@@ -2,9 +2,9 @@
 name: 📦 Build Appliance electon app
 on:
   push:
-    branches: [ "main"]
-    paths:
-      - 'appliance-application/**'
+#    branches: [ "main"]
+#    paths:
+#      - 'appliance-application/**'
   pull_request:
     branches: [ "main" ]
     paths:
