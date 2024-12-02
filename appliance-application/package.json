@@ -31,11 +31,11 @@
     "@vue/test-utils": "^2.4.6",
     "autoprefixer": "^10.4.16",
     "cross-env": "7.0.3",
-    "electron": "^31.3.1",
-    "electron-builder": "^24.13.3",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
     "eslint": "^9.8.0",
     "eslint-plugin-vue": "^9.18.1",
-    "happy-dom": "^14.12.3",
+    "happy-dom": "^15.11.7",
     "nano-staged": "0.8.0",
     "playwright": "^1.45.3",
     "postcss": "^8.4.31",
@@ -45,12 +45,12 @@
     "unplugin-auto-expose": "0.0.5",
     "vite": "^5.3.5",
     "vitest": "^2.0.5",
-    "vue": "^3.4.35",
+    "vue": "^3.5.13",
     "vue-tsc": "^2.0.29"
   },
   "dependencies": {
     "@apollo/client": "^3.10.8",
-    "@elgato-stream-deck/node": "^6.2.0",
+    "@elgato-stream-deck/node": "^7.1.1",
     "@heroicons/vue": "^2.0.18",
     "@julusian/jpeg-turbo": "^2.1.0",
     "axios": "^1.6.2",
@@ -58,7 +58,6 @@
     "graphql": "^16.8.1",
     "graphql-ws": "^5.16.0",
     "sharp": "^0.33.4",
-    "vue-template-compiler": "^2.7.16",
     "ws": "^8.14.2"
   }
 }
