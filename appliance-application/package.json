@@ -4,6 +4,11 @@
   "version": "1.0.0",
   "private": true,
   "main": "packages/main/dist/index.mjs",
+  "repository": "bigbluebutton/bigbluebutton-room-media-connector",
+  "author": {
+    "name": "Samuel Weirich",
+    "email": "samuel.weirich@ges.thm.de"
+  },
   "scripts": {
     "build": "npm run build:main && npm run build:preload && npm run build:renderer",
     "build:main": "cd ./packages/main && vite build",
