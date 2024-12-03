@@ -23,9 +23,20 @@ module.exports = async function () {
 
     npmRebuild: false,
 
+    appId: 'org.bigbluebutton.room-media.appliance',
+
     // Specify linux target just for disabling snap compilation
     linux: {
-      target: 'deb',
+      target: ['deb','rpm']
     },
+    win: {
+      target: ['portable']
+    },
+
+    publish: [
+      {
+        provider: "github"
+      }
+    ]
   };
 };
