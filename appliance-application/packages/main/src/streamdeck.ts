@@ -38,6 +38,8 @@ export class StreamDeckHID implements HID {
 
     this.streamDeck.clearPanel();
 
+    this.streamDeck.setBrightness(100);
+
     this.initIcons().then(() => {
       this.showBBBScreen();
     });
