@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Write udev rules for BBB Room Connector
-cat <<EOT > /etc/udev/rules.d/50-bbb-room-connector.rules
+cat <<EOT > /lib/udev/rules.d/50-bbb-room-connector.rules
 SUBSYSTEM=="input", GROUP="input", MODE="0660", TAG+="uaccess"
 SUBSYSTEM=="usb", ATTRS{idVendor}=="0fd9", ATTRS{idProduct}=="0060", MODE="660", TAG+="uaccess"
 SUBSYSTEM=="usb", ATTRS{idVendor}=="0fd9", ATTRS{idProduct}=="0063", MODE="660", TAG+="uaccess"
