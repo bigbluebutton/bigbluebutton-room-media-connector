@@ -60,3 +60,17 @@ jobs:
         with:
           name: "Appliance Application .rpm"
           path: appliance-application/dist/*.rpm
+
+      - name: Upload .exe artifact
+        uses: actions/upload-artifact@v4
+        if: matrix.os == 'windows-latest'
+        with:
+          name: "Appliance Application .exe"
+          path: appliance-application/dist/*.exe
+
+      - name: Upload .app artifact
+        uses: actions/upload-artifact@v4
+        if: matrix.os == 'mac-latest'
+        with:
+          name: "Appliance Application .app"
+          path: appliance-application/dist/*.app
