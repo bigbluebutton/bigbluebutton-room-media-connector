@@ -1,9 +1,9 @@
 import {app} from 'electron';
 import './security-restrictions';
-import {restoreOrCreateWindow, hdiDevices } from '/@/mainWindow';
+import {restoreOrCreateWindow, hdiDevices} from '/@/mainWindow';
 import {listStreamDecks, openStreamDeck} from '@elgato-stream-deck/node';
 import {StreamDeckHID} from '/@/streamdeck';
-import { autoUpdater } from "electron-updater";
+import {autoUpdater} from 'electron-updater';
 
 /**
  * Prevent electron from running multiple instances.
@@ -27,11 +27,11 @@ app.on('window-all-closed', () => {
 let isQuitting = false;
 
 app.on('before-quit', async (event: Event): Promise<void> => {
-  if(!isQuitting) {
+  if (!isQuitting) {
     event.preventDefault();
     isQuitting = true;
 
-    const promises = hdiDevices.map((device) => {
+    const promises = hdiDevices.map(device => {
       return device.close();
     });
 
@@ -58,23 +58,19 @@ app
     try {
       const allStreamDeckDevices = await listStreamDecks();
 
-      const streamDecks = allStreamDeckDevices.map((device) => {
+      const streamDecks = allStreamDeckDevices.map(device => {
         return openStreamDeck(device.path, {resetToLogoOnClose: true});
       });
 
-      (await Promise.all(streamDecks)).forEach((streamDeck) => {
-        console.debug('Stream Deck found: '+streamDeck.PRODUCT_NAME);
+      (await Promise.all(streamDecks)).forEach(streamDeck => {
+        console.debug('Stream Deck found: ' + streamDeck.PRODUCT_NAME);
         hdiDevices.push(new StreamDeckHID(streamDeck));
       });
-
     } catch (e) {
       console.error(e);
     }
-
-
   })
   .catch(e => console.error('Failed create window:', e));
-
 
 /**
  * Check for app updates, install it in background and notify user that new version was installed.

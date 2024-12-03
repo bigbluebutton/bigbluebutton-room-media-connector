@@ -1,4 +1,3 @@
-
 export default class BBBWebSocket {
   public url: string;
   public reconnect_interval_time: number;
@@ -18,7 +17,7 @@ export default class BBBWebSocket {
   }
 
   connect(roomConfig) {
-    try{
+    try {
       this.connection = new WebSocket(this.url);
     } catch (error) {
       this.connection_status_callback(false);
@@ -34,7 +33,6 @@ export default class BBBWebSocket {
       this.ping_interval = setInterval(() => {
         this.ping();
       }, this.ping_interval_time);
-
     });
 
     this.connection.addEventListener('close', () => {
@@ -42,20 +40,20 @@ export default class BBBWebSocket {
       this.reconnect(roomConfig);
     });
 
-    this.connection.addEventListener('message', (event) => {
+    this.connection.addEventListener('message', event => {
       const data = JSON.parse(event.data);
 
-      if(data.action == 'new_pin'){
+      if (data.action == 'new_pin') {
         this.new_pin_callback(data.pin.toString());
       }
 
-      if(data.action == 'start'){
+      if (data.action == 'start') {
         this.offer_callback(data.urls, data.pairing_pin.toString());
       }
     });
   }
 
-  reconnect(roomConfig, timeout: number|null = null) {
+  reconnect(roomConfig, timeout: number | null = null) {
     const reconnect_timeout = timeout || this.reconnect_interval_time;
     setTimeout(() => {
       this.connect(roomConfig);

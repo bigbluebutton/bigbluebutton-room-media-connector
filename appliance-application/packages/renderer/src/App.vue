@@ -1,5 +1,4 @@
 <script lang="ts" setup>
-
 import PairingCode from '/@/components/PairingCode.vue';
 import {inject, onMounted, ref} from 'vue';
 import BBBWebSocket from '/@/websocket';
@@ -7,14 +6,13 @@ import LoadingSpinner from '/@/components/LoadingSpinner.vue';
 import ConnectionError from '/@/components/ConnectionError.vue';
 import RoomOffer from '/@/components/RoomOffer.vue';
 import ConfigMissing from '/@/components/ConfigMissing.vue';
-import {XMarkIcon} from "@heroicons/vue/24/solid";
+import {XMarkIcon} from '@heroicons/vue/24/solid';
 
 const config = inject('config');
 
 const pin = ref<string | null>(null);
 const offer = ref<object | null>(null);
 const ws_connection_failed = ref(false);
-
 
 const onConnectionChanged = (status: boolean) => {
   ws_connection_failed.value = !status;
@@ -24,7 +22,7 @@ const onNewPin = (newPin: string) => {
   pin.value = newPin;
 };
 
-const onNewOffer = (urls, pairingCode ) => {
+const onNewOffer = (urls, pairingCode) => {
   console.log('new offer', urls, pairingCode);
   offer.value = {urls, pairingCode};
   window.electronAPI.newOffer();
@@ -38,21 +36,22 @@ const closeApp = () => {
   window.electronAPI.close();
 };
 
-
-
 let ws = null;
 
-function connect(){
-  ws = new BBBWebSocket(config.config.control_server.ws, config.config.control_server.reconnect_interval, config.config.control_server.ping_interval);
+function connect() {
+  ws = new BBBWebSocket(
+    config.config.control_server.ws,
+    config.config.control_server.reconnect_interval,
+    config.config.control_server.ping_interval,
+  );
   ws.setConnectionStatusCallback(onConnectionChanged);
   ws.setNewPinCallback(onNewPin);
   ws.setOfferCallback(onNewOffer);
   ws.connect(config.config.room);
 }
 
-
 onMounted(() => {
-  if(config.config){
+  if (config.config) {
     connect();
   }
 });
@@ -68,8 +67,6 @@ function onRejectOffer() {
   ws.rejectOffer();
   offer.value = null;
 }
-
-
 </script>
 
 <template>
@@ -96,7 +93,7 @@ function onRejectOffer() {
       <div class="block mt-4 w-full">
         <div
           v-if="config.config"
-          class="flex items-center flex-col justify-center px-10 "
+          class="flex items-center flex-col justify-center px-10"
         >
           <loading-spinner
             v-if="!pin"

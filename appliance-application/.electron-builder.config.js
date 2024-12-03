@@ -16,7 +16,7 @@ module.exports = async function () {
       output: 'dist',
       buildResources: 'buildResources',
     },
-    files: ['packages/**/dist/**', "packages/**/assets/**"],
+    files: ['packages/**/dist/**', 'packages/**/assets/**'],
     extraMetadata: {
       version: getVersion(),
     },
@@ -27,22 +27,22 @@ module.exports = async function () {
 
     // Specify linux target just for disabling snap compilation
     linux: {
-      target: ['deb','rpm']
+      target: ['deb', 'rpm'],
     },
     win: {
-      target: ['portable']
+      target: ['portable'],
     },
     deb: {
-      afterInstall:"linux/after-install.tpl",
+      afterInstall: 'linux/after-install.tpl',
     },
     rpm: {
-      afterInstall:"linux/after-install.tpl",
+      afterInstall: 'linux/after-install.tpl',
     },
 
     publish: [
       {
-        provider: "github"
-      }
-    ]
+        provider: 'github',
+      },
+    ],
   };
 };

@@ -10,19 +10,18 @@ import {DisplayManager} from '/@/displayManager';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export const hdiDevices:HID[] = [];
+export const hdiDevices: HID[] = [];
 
 async function createWindow() {
-
   // Loading config file
   const appUserDataPath = app.getPath('userData');
   const path = appUserDataPath + '/settings.json';
   let config = null;
   try {
-    config = JSON.parse(fs.readFileSync( path, 'utf8'));
-    console.log('Config loaded from '+path);
+    config = JSON.parse(fs.readFileSync(path, 'utf8'));
+    console.log('Config loaded from ' + path);
   } catch (e) {
-    console.log('No config found in '+path);
+    console.log('No config found in ' + path);
   }
 
   // Get all connected screens
@@ -33,10 +32,17 @@ async function createWindow() {
 
   const allDisplays = displayManager.getDisplays();
   allDisplays.forEach(display => {
-    console.log('Found display '+display.label+' with size '+display.size.width+'x'+display.size.height);
+    console.log(
+      'Found display ' +
+        display.label +
+        ' with size ' +
+        display.size.width +
+        'x' +
+        display.size.height,
+    );
   });
 
-  console.log('Preferred pin screen: '+pinDisplayLabel);
+  console.log('Preferred pin screen: ' + pinDisplayLabel);
 
   const pinDisplay = displayManager.getDisplay(pinDisplayLabel) || displayManager.getDisplays()[0];
 
@@ -61,12 +67,15 @@ async function createWindow() {
   });
 
   ipcMain.on('newOffer', () => {
-    hdiDevices.forEach((device) => {
-      device.newOffer(() => {
-        browserWindow.webContents.send('acceptOffer');
-      }, () => {
-        browserWindow.webContents.send('rejectOffer');
-      });
+    hdiDevices.forEach(device => {
+      device.newOffer(
+        () => {
+          browserWindow.webContents.send('acceptOffer');
+        },
+        () => {
+          browserWindow.webContents.send('rejectOffer');
+        },
+      );
     });
   });
 
@@ -77,7 +86,7 @@ async function createWindow() {
   ipcMain.on('acceptOffer', async (event, offer) => {
     console.log('acceptOffer', offer);
 
-    hdiDevices.forEach((device) => {
+    hdiDevices.forEach(device => {
       device.acceptedOffer();
     });
 
@@ -86,38 +95,36 @@ async function createWindow() {
     const leaveCallback = () => {
       console.log('should leave software');
 
-      hdiDevices.forEach((device) => {
+      hdiDevices.forEach(device => {
         device.disconnected();
       });
 
       browserWindow.webContents.send('triggerNewPin');
     };
 
-    if(!await bbbMeeting.join(leaveCallback)) {
+    if (!(await bbbMeeting.join(leaveCallback))) {
       console.log('failed to join');
     }
 
     console.log('joined');
-    hdiDevices.forEach((device) => {
+    hdiDevices.forEach(device => {
       device.connected(async () => {
         console.log('should leave hardware');
         await bbbMeeting.leave();
 
-        hdiDevices.forEach((device) => {
+        hdiDevices.forEach(device => {
           device.disconnected();
         });
 
         browserWindow.webContents.send('triggerNewPin');
-
       });
     });
-
   });
 
   ipcMain.on('rejectOffer', () => {
     console.log('rejectOffer');
 
-    hdiDevices.forEach((device) => {
+    hdiDevices.forEach(device => {
       device.rejectedOffer();
     });
   });
@@ -166,7 +173,6 @@ async function createWindow() {
  * Restore an existing BrowserWindow or Create a new BrowserWindow.
  */
 export async function restoreOrCreateWindow() {
-
   let window = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
 
   if (window === undefined) {

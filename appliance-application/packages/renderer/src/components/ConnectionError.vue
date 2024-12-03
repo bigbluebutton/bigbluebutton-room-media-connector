@@ -16,6 +16,5 @@
 </template>
 
 <script setup>
-import { ExclamationTriangleIcon } from '@heroicons/vue/24/solid';
-
+import {ExclamationTriangleIcon} from '@heroicons/vue/24/solid';
 </script>

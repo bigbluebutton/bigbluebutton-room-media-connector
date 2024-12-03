@@ -1,5 +1,4 @@
 export interface HID {
-
   newOffer(accept: () => void, reject: () => void): void;
 
   acceptedOffer(): void;

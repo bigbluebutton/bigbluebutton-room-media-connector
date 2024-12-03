@@ -1,13 +1,12 @@
-import { BrowserWindow} from 'electron';
+import {BrowserWindow} from 'electron';
 import {app, screen} from 'electron';
 import Display = Electron.Display;
 import type {ApolloClient, NormalizedCacheObject} from '@apollo/client/core';
-import { gql } from '@apollo/client/core';
+import {gql} from '@apollo/client/core';
 import {BBBGraphql} from '/@/bbb-graphql';
-import {DisplayManager} from "/@/displayManager";
+import {DisplayManager} from '/@/displayManager';
 
-export class BBBMeeting{
-
+export class BBBMeeting {
   private screens;
 
   private displayManager: DisplayManager;
@@ -17,7 +16,6 @@ export class BBBMeeting{
   private apolloClient: ApolloClient<NormalizedCacheObject>;
   private user_id: any;
   private bbbGraphQl: BBBGraphql;
-
 
   constructor(control, screens, displayManager) {
     this.screens = screens;
@@ -32,12 +30,11 @@ export class BBBMeeting{
     this.openScreens();
 
     this.bbbGraphQl = new BBBGraphql(this.control);
-    if(await this.bbbGraphQl.connect()){
+    if (await this.bbbGraphQl.connect()) {
       console.log('connected to graphql');
 
       this.user_id = this.bbbGraphQl.getUserId();
       this.apolloClient = this.bbbGraphQl.getApolloClient();
-
 
       this.onUsersLeft(async () => {
         console.log('all users left');
@@ -46,44 +43,45 @@ export class BBBMeeting{
       });
 
       return true;
-
     }
 
     return false;
   }
 
   private onUsersLeft(callback) {
-    const USER_COUNT = gql`subscription($userId: String) {
-      user_aggregate(where: {extId: {_nlike: $userId}}) {
-        aggregate {
-          count
+    const USER_COUNT = gql`
+      subscription ($userId: String) {
+        user_aggregate(where: {extId: {_nlike: $userId}}) {
+          aggregate {
+            count
+          }
         }
       }
-    }`;
+    `;
 
-    this.apolloClient.subscribe({
-      query: USER_COUNT,
-      variables: {
-        userId: this.user_id+'%',
-      },
-    })
+    this.apolloClient
+      .subscribe({
+        query: USER_COUNT,
+        variables: {
+          userId: this.user_id + '%',
+        },
+      })
       .subscribe({
         next(data) {
           const userCount = data.data.user_aggregate.aggregate.count;
 
           console.log('userCount', userCount);
-          if(userCount == 0) {
+          if (userCount == 0) {
             callback();
           }
         },
-        error(err) { console.error('err', err); },
+        error(err) {
+          console.error('err', err);
+        },
       });
   }
 
   private openScreens() {
-
-
-
     for (const [screen, url] of Object.entries(this.screens)) {
       const screenDisplay = this.displayManager.getDisplay(screen);
 
@@ -106,29 +104,25 @@ export class BBBMeeting{
         webPreferences: {
           partition: partition,
           contextIsolation: true,
-
         },
       });
-
 
       this.windows.push(screenWindows);
 
       screenWindows.loadURL(url);
 
       //screenWindows.webContents.openDevTools();
-
-
     }
   }
 
   private closeScreens() {
-    this.windows.forEach((window) => {
+    this.windows.forEach(window => {
       window.close();
       window.destroy();
     });
   }
 
-  public async leave(){
+  public async leave() {
     this.closeScreens();
     await this.bbbGraphQl.leaveMeeting();
   }
