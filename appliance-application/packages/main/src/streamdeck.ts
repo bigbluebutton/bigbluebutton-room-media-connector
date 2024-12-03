@@ -2,7 +2,7 @@ import * as path from 'path';
 import sharp from 'sharp';
 import {StreamDeck} from '@elgato-stream-deck/node';
 import { fileURLToPath } from 'url';
-import {HID} from '/@/HID';
+import {HID} from './HID';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

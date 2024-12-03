@@ -29,11 +29,6 @@ const config = {
       entry: 'src/index.ts',
       formats: ['es'],
     },
-    commonjsOptions: {
-      exclude: [
-        'node-hid',
-      ],
-    },
     rollupOptions: {
       output: {
         entryFileNames: '[name].mjs',

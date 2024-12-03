@@ -21,6 +21,8 @@ module.exports = async function () {
       version: getVersion(),
     },
 
+    npmRebuild: false,
+
     // Specify linux target just for disabling snap compilation
     linux: {
       target: 'deb',
