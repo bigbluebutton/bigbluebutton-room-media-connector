@@ -34,9 +34,6 @@ module.exports = async function () {
     },
     mac: {
       target: "dmg",
-      arch: [
-        "universal"
-      ]
     },
     deb: {
       afterInstall: 'installer/linux/after-install.tpl',
