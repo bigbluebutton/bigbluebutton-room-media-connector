@@ -1,11 +1,11 @@
 import {app, BrowserWindow, ipcMain, screen, session} from 'electron';
 import {join, resolve} from 'node:path';
 import fs from 'fs';
-import {HID} from '/@/HID';
+import type {HID} from '/@/HID';
 import {BBBMeeting} from '/@/bbb-meeting';
-import {fileURLToPath} from "url";
-import path from "path";
-import {DisplayManager} from "/@/displayManager";
+import {fileURLToPath} from 'url';
+import path from 'path';
+import {DisplayManager} from '/@/displayManager';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,8 +20,9 @@ async function createWindow() {
   let config = null;
   try {
     config = JSON.parse(fs.readFileSync( path, 'utf8'));
+    console.log('Config loaded from '+path);
   } catch (e) {
-    console.log('No config found');
+    console.log('No config found in '+path);
   }
 
   // Get all connected screens
@@ -29,6 +30,14 @@ async function createWindow() {
 
   // Get display for the pin screen
   const pinDisplayLabel = config ? config['preferred_pin_screen'] : '';
+
+  const allDisplays = displayManager.getDisplays();
+  allDisplays.forEach(display => {
+    console.log('Found display '+display.label+' with size '+display.size.width+'x'+display.size.height);
+  });
+
+  console.log('Preferred pin screen: '+pinDisplayLabel);
+
   const pinDisplay = displayManager.getDisplay(pinDisplayLabel) || displayManager.getDisplays()[0];
 
   const browserWindow = new BrowserWindow({
@@ -48,7 +57,7 @@ async function createWindow() {
   });
 
   ipcMain.handle('getConfig', () => {
-    return {path, config}
+    return {path, config};
   });
 
   ipcMain.on('newOffer', () => {
@@ -61,6 +70,10 @@ async function createWindow() {
     });
   });
 
+  ipcMain.on('close', async () => {
+    app.quit();
+  });
+
   ipcMain.on('acceptOffer', async (event, offer) => {
     console.log('acceptOffer', offer);
 
@@ -71,7 +84,7 @@ async function createWindow() {
     const bbbMeeting = new BBBMeeting(offer.urls.control, offer.urls.screens, displayManager);
 
     const leaveCallback = () => {
-      console.log("should leave software");
+      console.log('should leave software');
 
       hdiDevices.forEach((device) => {
         device.disconnected();
@@ -81,13 +94,13 @@ async function createWindow() {
     };
 
     if(!await bbbMeeting.join(leaveCallback)) {
-      console.log("failed to join");
+      console.log('failed to join');
     }
 
     console.log('joined');
     hdiDevices.forEach((device) => {
       device.connected(async () => {
-        console.log("should leave hardware");
+        console.log('should leave hardware');
         await bbbMeeting.leave();
 
         hdiDevices.forEach((device) => {
@@ -121,7 +134,7 @@ async function createWindow() {
     browserWindow?.show();
 
     if (import.meta.env.DEV) {
-      browserWindow?.webContents.openDevTools();
+      //browserWindow?.webContents.openDevTools();
     }
   });
 

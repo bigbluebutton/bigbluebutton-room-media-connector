@@ -3,7 +3,7 @@ import './security-restrictions';
 import {restoreOrCreateWindow, hdiDevices } from '/@/mainWindow';
 import {listStreamDecks, openStreamDeck} from '@elgato-stream-deck/node';
 import {StreamDeckHID} from '/@/streamdeck';
-
+import { autoUpdater } from "electron-updater";
 
 /**
  * Prevent electron from running multiple instances.
@@ -20,19 +20,24 @@ app.on('second-instance', restoreOrCreateWindow);
  */
 app.disableHardwareAcceleration();
 
-/**
- * Shout down background process if all windows was closed
- */
-app.on('window-all-closed', async () => {
-
-
+app.on('window-all-closed', () => {
   app.quit();
 });
 
-app.on('before-quit', async function () {
-  console.log("closing");
-  for (const device of hdiDevices) {
-    await device.close();
+let isQuitting = false;
+
+app.on('before-quit', async (event: Event): Promise<void> => {
+  if(!isQuitting) {
+    event.preventDefault();
+    isQuitting = true;
+
+    const promises = hdiDevices.map((device) => {
+      return device.close();
+    });
+
+    await Promise.all(promises);
+
+    app.quit();
   }
 });
 
@@ -51,14 +56,19 @@ app
     console.log('App is ready');
 
     try {
-      const allStreamDecks = await listStreamDecks();
-      console.debug('All Streamdecks found: ', allStreamDecks);
-      const myStreamDeck = await openStreamDeck(allStreamDecks[0].path);
-      console.debug('Streamdeck found: ', myStreamDeck);
-      hdiDevices.push(new StreamDeckHID(myStreamDeck));
+      const allStreamDeckDevices = await listStreamDecks();
+
+      const streamDecks = allStreamDeckDevices.map((device) => {
+        return openStreamDeck(device.path, {resetToLogoOnClose: true});
+      });
+
+      (await Promise.all(streamDecks)).forEach((streamDeck) => {
+        console.debug('Stream Deck found: '+streamDeck.PRODUCT_NAME);
+        hdiDevices.push(new StreamDeckHID(streamDeck));
+      });
+
     } catch (e) {
       console.error(e);
-      console.log('No Streamdeck found');
     }
 
 
@@ -75,17 +85,12 @@ app
  * if you compile production app without publishing it to distribution server.
  * Like `npm run compile` does. It's ok 😅
  */
+/**
+ * Check for new version of the application - production mode only.
 if (import.meta.env.PROD) {
-  app
-    .whenReady()
-    .then(() =>
-      /**
-       * Here we forced to use `require` since electron doesn't fully support dynamic import in asar archives
-       * @see https://github.com/electron/electron/issues/38829
-       * Potentially it may be fixed by this https://github.com/electron/electron/pull/37535
-       */
-      require('electron-updater').autoUpdater.checkForUpdatesAndNotify(),
-    )
-    .catch(e => console.error('Failed check and install updates:', e));
+  app.
+  whenReady()
+    .then(autoUpdater.checkForUpdatesAndNotify())
+    .catch((e) => console.error('Failed check updates:', e));
 }
-
+*/

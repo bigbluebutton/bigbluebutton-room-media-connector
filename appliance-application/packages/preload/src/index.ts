@@ -8,4 +8,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   handleAcceptOffer: (callback) => ipcRenderer.on('acceptOffer', callback),
   handleRejectOffer: (callback) => ipcRenderer.on('rejectOffer', callback),
   handleTriggerNewPin: (callback) => ipcRenderer.on('triggerNewPin', callback),
+  close: () => ipcRenderer.send('close'),
 });

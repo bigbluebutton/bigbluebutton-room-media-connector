@@ -1,18 +1,19 @@
 import * as path from 'path';
 import sharp from 'sharp';
-import {StreamDeck} from '@elgato-stream-deck/node';
+import type {StreamDeck} from '@elgato-stream-deck/node';
 import { fileURLToPath } from 'url';
-import {HID} from './HID';
+import type {HID} from './HID';
+import type {StreamDeckButtonControlDefinitionLcdFeedback} from '@elgato-stream-deck/core/dist/controlDefinition';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export class StreamDeckHID implements HID {
 
-  static readonly BBB_BUTTON: number = 0;
-  static readonly ACCEPT_BUTTON: number = 1;
-  static readonly  REJECT_BUTTON: number = 4;
-  static readonly  LEAVE_BUTTON: number = 5;
+  static BBB_BUTTON : StreamDeckButtonControlDefinitionLcdFeedback;
+  static ACCEPT_BUTTON : StreamDeckButtonControlDefinitionLcdFeedback;
+  static REJECT_BUTTON : StreamDeckButtonControlDefinitionLcdFeedback;
+  static LEAVE_BUTTON : StreamDeckButtonControlDefinitionLcdFeedback;
 
   private streamDeck: StreamDeck;
 
@@ -44,22 +45,22 @@ export class StreamDeckHID implements HID {
       this.showBBBScreen();
     });
 
-    this.streamDeck.on('up', (keyIndex) => {
-      console.log('key %d up', keyIndex);
+    this.streamDeck.on('up', (button) => {
+      console.log('key %d up', button.index);
 
-      if (keyIndex === StreamDeckHID.ACCEPT_BUTTON && this.hasOffer) {
+      if (button.index === StreamDeckHID.ACCEPT_BUTTON.index && this.hasOffer) {
         this.hasOffer = false;
         this.hideOfferButtons();
         this.acceptCallback();
       }
 
-      if (keyIndex === StreamDeckHID.REJECT_BUTTON && this.hasOffer) {
+      if (button.index === StreamDeckHID.REJECT_BUTTON.index && this.hasOffer) {
         this.hasOffer = false;
         this.hideOfferButtons();
         this.rejectCallback();
       }
 
-      if (keyIndex === StreamDeckHID.LEAVE_BUTTON) {
+      if (button.index === StreamDeckHID.LEAVE_BUTTON.index) {
         this.isConnected = true;
         this.leaveCallback();
       }
@@ -71,36 +72,66 @@ export class StreamDeckHID implements HID {
   }
 
   async initIcons() {
+
+    const controls = this.streamDeck.CONTROLS;
+    let rows = 0;
+    let columns = 0;
+
+    controls.forEach((control) => {
+      if(control.type === 'button' && control.feedbackType == 'lcd') {
+        rows = Math.max(rows, control.row);
+        columns = Math.max(columns, control.column);
+      }
+    });
+
+    controls.forEach((control) => {
+      if(control.type === 'button' && control.feedbackType == 'lcd') {
+        if (control.row == 0 && control.column == 0) {
+          StreamDeckHID.BBB_BUTTON = control;
+        }
+        if (control.row == rows && control.column == columns) {
+          StreamDeckHID.LEAVE_BUTTON = control;
+        }
+        if (control.row == 1 && control.column == 0) {
+          StreamDeckHID.ACCEPT_BUTTON = control;
+        }
+        if (control.row == 1 && control.column == 1) {
+          StreamDeckHID.REJECT_BUTTON = control;
+        }
+      }
+    });
+
+
     this.BBB_IMG = await sharp(path.resolve( __dirname,'../assets/bbb.png'))
       .flatten()
-      .resize(this.streamDeck.ICON_SIZE, this.streamDeck.ICON_SIZE)
+      .resize(StreamDeckHID.BBB_BUTTON.pixelSize.width, StreamDeckHID.BBB_BUTTON.pixelSize.height)
       .raw()
       .toBuffer();
 
     this.BBB_IMG_LG = await sharp(path.resolve( __dirname,'../assets/bbb.png'))
       .flatten()
-      .resize(this.streamDeck.ICON_SIZE*this.streamDeck.KEY_COLUMNS, this.streamDeck.ICON_SIZE*this.streamDeck.KEY_ROWS, {
+      .resize(StreamDeckHID.BBB_BUTTON.pixelSize.width*(columns+1), StreamDeckHID.BBB_BUTTON.pixelSize.height*(rows+1), {
         fit: 'contain',
-        background: { r: 0, g: 0, b: 0}
+        background: { r: 0, g: 0, b: 0},
       })
       .raw()
       .toBuffer();
 
     this.ACCEPT_IMG = await sharp(path.resolve( __dirname,'../assets/accept.png'))
       .flatten()
-      .resize(this.streamDeck.ICON_SIZE, this.streamDeck.ICON_SIZE)
+      .resize(StreamDeckHID.ACCEPT_BUTTON.pixelSize.width, StreamDeckHID.ACCEPT_BUTTON.pixelSize.height)
       .raw()
       .toBuffer();
 
     this.REJECT_IMG = await sharp(path.resolve(__dirname,'../assets/reject.png'))
       .flatten()
-      .resize(this.streamDeck.ICON_SIZE, this.streamDeck.ICON_SIZE)
+      .resize(StreamDeckHID.REJECT_BUTTON.pixelSize.width, StreamDeckHID.REJECT_BUTTON.pixelSize.height)
       .raw()
       .toBuffer();
 
     this.LEAVE_IMG = await sharp(path.resolve( __dirname,'../assets/leave.png'))
       .flatten()
-      .resize(this.streamDeck.ICON_SIZE, this.streamDeck.ICON_SIZE)
+      .resize(StreamDeckHID.LEAVE_BUTTON.pixelSize.width, StreamDeckHID.LEAVE_BUTTON.pixelSize.height)
       .raw()
       .toBuffer();
   }
@@ -127,9 +158,9 @@ export class StreamDeckHID implements HID {
   showOfferButtons(): void {
     this.streamDeck.clearPanel();
 
-    this.streamDeck.fillKeyBuffer(StreamDeckHID.BBB_BUTTON, this.BBB_IMG);
-    this.streamDeck.fillKeyBuffer(StreamDeckHID.ACCEPT_BUTTON, this.ACCEPT_IMG);
-    this.streamDeck.fillKeyBuffer(StreamDeckHID.REJECT_BUTTON, this.REJECT_IMG);
+    this.streamDeck.fillKeyBuffer(StreamDeckHID.BBB_BUTTON.index, this.BBB_IMG);
+    this.streamDeck.fillKeyBuffer(StreamDeckHID.ACCEPT_BUTTON.index, this.ACCEPT_IMG);
+    this.streamDeck.fillKeyBuffer(StreamDeckHID.REJECT_BUTTON.index, this.REJECT_IMG);
   }
 
   showBBBScreen(): void {
@@ -138,21 +169,20 @@ export class StreamDeckHID implements HID {
   }
 
   hideOfferButtons(): void {
-    this.streamDeck.clearKey(StreamDeckHID.ACCEPT_BUTTON);
-    this.streamDeck.clearKey(StreamDeckHID.REJECT_BUTTON);
+    this.streamDeck.clearKey(StreamDeckHID.ACCEPT_BUTTON.index);
+    this.streamDeck.clearKey(StreamDeckHID.REJECT_BUTTON.index);
   }
 
   async close(): Promise<void> {
-    await this.streamDeck.clearPanel();
-    await this.streamDeck.removeAllListeners();
+    this.streamDeck.removeAllListeners();
     await this.streamDeck.close();
   }
 
   connected(leave: () => void): void {
     this.streamDeck.clearPanel();
 
-    this.streamDeck.fillKeyBuffer(StreamDeckHID.BBB_BUTTON, this.BBB_IMG);
-    this.streamDeck.fillKeyBuffer(StreamDeckHID.LEAVE_BUTTON, this.LEAVE_IMG);
+    this.streamDeck.fillKeyBuffer(StreamDeckHID.BBB_BUTTON.index, this.BBB_IMG);
+    this.streamDeck.fillKeyBuffer(StreamDeckHID.LEAVE_BUTTON.index, this.LEAVE_IMG);
 
     this.isConnected = true;
     this.leaveCallback = leave;
