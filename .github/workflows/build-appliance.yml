@@ -27,7 +27,7 @@ jobs:
       - name: Install Node.js and NPM
         uses: actions/setup-node@v4
         with:
-          node-version: 16.x
+          node-version: 20
 
       - name: Install system dependencies on Ubuntu
         if: matrix.os == 'ubuntu-latest'
@@ -47,8 +47,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload artifacts
+      - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest'
         with:
-            name: appliance-application-${{ matrix.os }}
-            path: appliance-application/dist
+            name: "Appliance Application .deb"
+            path: appliance-application/dist/*.deb
+
+      - name: Upload .rpm artifact
+        uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          name: "Appliance Application .rpm"
+          path: appliance-application/dist/*.rpm
