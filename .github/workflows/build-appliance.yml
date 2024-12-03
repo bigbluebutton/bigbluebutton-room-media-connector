@@ -73,4 +73,4 @@ jobs:
         if: matrix.os == 'macos-latest'
         with:
           name: "BBB-RoomMediaConnector.app"
-          path: appliance-application/dist/
+          path: appliance-application/dist/**/*.app

@@ -33,10 +33,10 @@ module.exports = async function () {
       target: ['portable'],
     },
     deb: {
-      afterInstall: 'linux/after-install.tpl',
+      afterInstall: 'installer/linux/after-install.tpl',
     },
     rpm: {
-      afterInstall: 'linux/after-install.tpl',
+      afterInstall: 'installer/linux/after-install.tpl',
     },
 
     publish: [
