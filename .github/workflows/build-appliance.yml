@@ -51,26 +51,26 @@ jobs:
         uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest'
         with:
-            name: "Appliance Application .deb"
+            name: "BBB-RoomMediaConnector.deb"
             path: appliance-application/dist/*.deb
 
       - name: Upload .rpm artifact
         uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest'
         with:
-          name: "Appliance Application .rpm"
+          name: "BBB-RoomMediaConnector.rpm"
           path: appliance-application/dist/*.rpm
 
       - name: Upload .exe artifact
         uses: actions/upload-artifact@v4
         if: matrix.os == 'windows-latest'
         with:
-          name: "Appliance Application .exe"
+          name: "BBB-RoomMediaConnector.exe"
           path: appliance-application/dist/*.exe
 
       - name: Upload .app artifact
         uses: actions/upload-artifact@v4
         if: matrix.os == 'mac-latest'
         with:
-          name: "Appliance Application .app"
+          name: "BBB-RoomMediaConnector.app"
           path: appliance-application/dist/*.app
