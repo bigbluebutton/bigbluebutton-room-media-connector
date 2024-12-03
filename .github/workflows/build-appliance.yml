@@ -72,5 +72,5 @@ jobs:
         uses: actions/upload-artifact@v4
         if: matrix.os == 'macos-latest'
         with:
-          name: "BBB-RoomMediaConnector.app"
-          path: appliance-application/dist/**/*.app
+          name: "BBB-RoomMediaConnector.dmg"
+          path: appliance-application/dist/*.dmg

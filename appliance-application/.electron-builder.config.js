@@ -32,12 +32,19 @@ module.exports = async function () {
     win: {
       target: ['portable'],
     },
+    mac: {
+      target: "dmg",
+      arch: [
+        "universal"
+      ]
+    },
     deb: {
       afterInstall: 'installer/linux/after-install.tpl',
     },
     rpm: {
       afterInstall: 'installer/linux/after-install.tpl',
     },
+
 
     publish: [
       {
