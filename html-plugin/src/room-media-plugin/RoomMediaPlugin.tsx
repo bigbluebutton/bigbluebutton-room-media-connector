@@ -25,7 +25,12 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
     const [showModal, setShowModal] = useState<boolean>(false);
     const pluginApi: PluginApi = BbbPluginSdk.getPluginApi(uuid);
     const {data: currentUser} = pluginApi.useCurrentUser();
-    const {data: pluginSettings} = pluginApi.usePluginSettings();
+    //const {data: pluginSettings} = pluginApi.usePluginSettings();
+
+    const pluginSettings = {
+        pairingWebsocketUrl: "wss://bbb-dev-bigbluebutton-openstack.uni-osnabrueck.de/hybrid/ws",
+    };
+
     const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
     const [filteredLayout, setFilteredLayout] = useState<Layout | null>(null);
     const [tempFilteredLayout, setTempFilteredLayout] = useState<Layout | null>(null);
@@ -232,6 +237,7 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
                             userID: baseJoinParameters.userID + "-" + key,
                             role: 'MODERATOR'
                         };
+                        console.log(joinParametersMap);
                         screenJoinUrls[key] = await pluginApi.getJoinUrl(joinParametersMap);
                     })
                 );

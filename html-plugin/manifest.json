@@ -1,0 +1,6 @@
+{
+  "requiredSdkVersion": "~0.0.68",
+  "name": "RoomMediaPlugin",
+  "javascriptEntrypointUrl": "RoomMediaPlugin.js",
+  "localesBaseUrl": "https://cdn.dominio.com/pluginabc/"
+}
