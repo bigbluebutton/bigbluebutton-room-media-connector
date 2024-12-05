@@ -13,7 +13,7 @@ The system consists of three software components that need to be run and configu
 
 1. The [room appliance application](appliance-application) needs to be run on a device (like Intel NUC) that connects to the room's audiovisual input and output devices. It holds the room configuration, i.e. how the media devices should be used in BBB and displays a PIN number that is used to pair the room with a BBB meeting.
 2. The [BBB HTML Plugin](html-plugin) is where you enter the PIN number displayed on the appliance to connect the running meeting to the room.
-3. The [pairing server](pairing-server) brokers the connection between the appliance in the room and the BBB meeting.
+3. The [room hub](room-hub) brokers the connection between the appliance in the room and the BBB meeting.
 
 Both the Plugin and the appliance application use the GraphQL interface of BBB 3 to communicate with BBB server.
 

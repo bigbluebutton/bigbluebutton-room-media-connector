@@ -4,7 +4,7 @@
 ## What is it?
 
 This is a [BBB HTML plugin](https://github.com/bigbluebutton/bigbluebutton-html-plugin-sdk) where the user can enter the PIN displayed by the [room appliance application](../appliance-application/).
-It then checks this PIN with the [pairing-server](../pairing-server/) and afterwards creates the join-URLs for the applicance application.
+It then checks this PIN with the [room-hub](../room-hub/) and afterwards creates the join-URLs for the appliance application.
 To finish the pairing it shows the pairing pin for user confirmation.
 
 ## Usage
@@ -58,7 +58,7 @@ public:
     - name: RoomMediaPlugin
       url: <<PLUGIN_URL>>
       settings:
-        pairingWebsocketUrl: wss://your-pairing-server.org/hybrid/ws
+        pairingWebsocketUrl: wss://your-room-hub.org/hybrid/ws_plugin
 ```
 
 #### Hosting the Plugin on a BBB Server
