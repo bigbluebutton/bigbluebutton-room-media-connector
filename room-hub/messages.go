@@ -85,7 +85,7 @@ type VerificationCodeAcceptedMessage struct {
 
 type VerificationCodeResponseMessage struct {
 	Type   MessageType `json:"type" validate:"required"`
-	Status bool        `json:"status" validate:"required"`
+	Status bool        `json:"status" validate:"boolean"`
 }
 
 type VerificationCodeRejectedMessage struct {
