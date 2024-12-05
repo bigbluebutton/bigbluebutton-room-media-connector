@@ -164,7 +164,9 @@ func roomHandler(w http.ResponseWriter, r *http.Request) {
 
 		err = json.Unmarshal(msg, &registerRoomMessage)
 		if err != nil || registerRoomMessage.Type != MessageTypeRegisterRoom {
-			log.Printf("Error unmarshalling RegisterRoomMessage: %s", err)
+			if registerRoomMessage.Type != MessageTypePing {
+				log.Printf("Error unmarshalling RegisterRoomMessage: %s", err)
+			}
 			continue
 		}
 
@@ -266,7 +268,9 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 		var pairingPINUserInputMessage PairingPINUserInputMessage
 		err = json.Unmarshal(msg, &pairingPINUserInputMessage)
 		if err != nil || pairingPINUserInputMessage.Type != MessageTypePairingPINUserInput {
-			log.Printf("Error parsing PairingPINUserInputMessage: %s", msg)
+			if pairingPINUserInputMessage.Type != MessageTypePing {
+				log.Printf("Error parsing PairingPINUserInputMessage: %s", msg)
+			}
 			continue
 		}
 
@@ -324,7 +328,9 @@ func handleRoomLinksMessage(pluginConn *websocket.Conn, room *Room) bool {
 		var joinURLsMessage JoinURLsMessage
 		err = json.Unmarshal(msg, &joinURLsMessage)
 		if err != nil || joinURLsMessage.Type != MessageTypeJoinURLs {
-			log.Printf("Error parsing joinURLsMessage: %s", msg)
+			if joinURLsMessage.Type != MessageTypePing {
+				log.Printf("Error parsing joinURLsMessage: %s", msg)
+			}
 			continue
 		}
 
@@ -358,7 +364,9 @@ func handleVerificationResponse(roomConn *websocket.Conn) bool {
 		var verificationCodeResponseMessage VerificationCodeResponseMessage
 		err = json.Unmarshal(msg, &verificationCodeResponseMessage)
 		if err != nil || verificationCodeResponseMessage.Type != MessageTypeVerificationCodeResponse {
-			log.Printf("Error parsing VerificationCodeResponse: %s", err)
+			if verificationCodeResponseMessage.Type != MessageTypePing {
+				log.Printf("Error parsing VerificationCodeResponse: %s", err)
+			}
 			continue
 		}
 

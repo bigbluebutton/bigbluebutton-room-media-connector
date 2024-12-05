@@ -9,6 +9,7 @@ import (
 type MessageType string
 
 const (
+	MessageTypePing                     MessageType = "Ping"                     // ping
 	MessageTypePairingPIN               MessageType = "PairingPIN"               // assign pin to room (server -> appliance)
 	MessageTypeRegisterRoom             MessageType = "RegisterRoom"             // appliance registers with room config (appliance -> server)
 	MessageTypePairingPINUserInput      MessageType = "PairingPINUserInput"      // connect to room (plugin -> server)
@@ -22,6 +23,10 @@ const (
 )
 
 // Messages
+type PingMessage struct {
+	Type MessageType `json:"type" validate:"required"`
+}
+
 type RegisterRoomMessage struct {
 	Type       MessageType `json:"type" validate:"required"`
 	RoomConfig RoomConfig  `json:"roomConfig" validate:"required"`
