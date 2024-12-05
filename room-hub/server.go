@@ -4,14 +4,14 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
-	"github.com/go-playground/validator/v10"
 	"log"
 	"math/big"
 	"net/http"
 	"os"
-	"strconv"
 	"sync"
 	"time"
+
+	"github.com/go-playground/validator/v10"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -49,7 +49,7 @@ var upgrader = websocket.Upgrader{
 type ConnectionManager struct {
 	sync.Mutex
 	rooms     map[string]*Room
-	pinToRoom map[int]string // Used to look up roomID via room PIN
+	pinToRoom map[string]string // Used to look up roomID via room PIN
 }
 
 // Struct to store room connection and configuration
@@ -62,11 +62,11 @@ type Room struct {
 // Initialize ConnectionManager instance
 var connManager = &ConnectionManager{
 	rooms:     make(map[string]*Room),
-	pinToRoom: make(map[int]string),
+	pinToRoom: make(map[string]string),
 }
 
 // Function to generate a new room ID
-func generatePIN() (int, error) {
+func generatePIN() (string, error) {
 	const PINLength int = 6
 	const maxTries = 1000
 
@@ -75,18 +75,16 @@ func generatePIN() (int, error) {
 		var pin, err = randomString(PINLength, Digits)
 		if err != nil {
 			log.Printf("failed to generate room ID: %s", err)
-			return 0, err
+			return "", err
 		}
 
-		var pinInt, _ = strconv.Atoi(pin)
-
-		_, PINexists := connManager.pinToRoom[pinInt]
+		_, PINexists := connManager.pinToRoom[pin]
 		if !PINexists {
-			return pinInt, nil
+			return pin, nil
 		}
 	}
 	// No pin generated after maxTries
-	return 0, errors.New("PIN generation failed")
+	return "", errors.New("PIN generation failed")
 }
 
 func generateVerificationCode() (string, error) {
@@ -94,7 +92,7 @@ func generateVerificationCode() (string, error) {
 	return randomString(length, ASCIILettersUppercase+Digits)
 }
 
-func rotatePIN(roomID string, oldPIN int, roomConn *websocket.Conn) (newPIN int) {
+func rotatePIN(roomID string, oldPIN string, roomConn *websocket.Conn) (newPIN string) {
 	connManager.Lock()
 	// Generate a new PIN
 	newPIN, err := generatePIN()
@@ -111,16 +109,16 @@ func rotatePIN(roomID string, oldPIN int, roomConn *websocket.Conn) (newPIN int)
 	roomPINMessageJSON, err := createPairingPINMessage(newPIN)
 	if err != nil {
 		roomConn.Close()
-		return 0
+		return ""
 	}
 
 	if err := roomConn.WriteMessage(websocket.TextMessage, roomPINMessageJSON); err != nil {
 		log.Println("write error:", err)
 		roomConn.Close()
-		return 0
+		return ""
 	}
 
-	log.Printf("Rotated PIN for roomId: %s, pin: %d", roomID, newPIN)
+	log.Printf("Rotated PIN for roomId: %s, pin: %s", roomID, newPIN)
 	return newPIN
 }
 
@@ -227,7 +225,7 @@ func handleRegisterRoomMessage(roomConn *websocket.Conn, msg RegisterRoomMessage
 		return
 	}
 
-	log.Printf("Room connected with pin: %d, roomID: %s", pin, roomID)
+	log.Printf("Room connected with pin: %s, roomID: %s", pin, roomID)
 
 	currentPIN := pin
 	go func() {
@@ -380,7 +378,7 @@ func handlePairingPINMessage(pluginConn *websocket.Conn, pairingPINUserInputMess
 	connManager.Lock()
 	roomID, exists := connManager.pinToRoom[pin]
 	if !exists {
-		log.Printf("Invalid pin received: %d", pin)
+		log.Printf("Invalid pin received: %s", pin)
 		connManager.Unlock()
 
 		// Respond with an error message
@@ -408,7 +406,7 @@ func handlePairingPINMessage(pluginConn *websocket.Conn, pairingPINUserInputMess
 	close(stopChan)
 	connManager.Unlock()
 
-	log.Printf("Resolved room with roomID: %s for pin: %d", roomID, pin)
+	log.Printf("Resolved room with roomID: %s for pin: %s", roomID, pin)
 
 	return room
 }

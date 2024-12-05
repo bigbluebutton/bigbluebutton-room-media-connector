@@ -34,7 +34,7 @@ type RoomConfig struct {
 }
 
 // creates a PairingPIN message and marshals it to JSON
-func createPairingPINMessage(pin int) ([]byte, error) {
+func createPairingPINMessage(pin string) ([]byte, error) {
 
 	message := PairingPINMessage{
 		Type: MessageTypePairingPIN,
@@ -51,12 +51,12 @@ func createPairingPINMessage(pin int) ([]byte, error) {
 
 type PairingPINUserInputMessage struct {
 	Type MessageType `json:"type" validate:"required"`
-	PIN  int         `json:"PIN" validate:"required,numeric,min=100000,max=999999"`
+	PIN  string      `json:"PIN" validate:"required,numeric,len=6"`
 }
 
 type PairingPINMessage struct {
 	Type MessageType `json:"type" validate:"required"`
-	PIN  int         `json:"PIN" validate:"required"`
+	PIN  string      `json:"PIN" validate:"required"`
 }
 
 type PairingPINFoundMessage struct {
