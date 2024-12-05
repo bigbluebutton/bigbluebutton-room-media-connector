@@ -497,9 +497,9 @@ func main() {
 	host := os.Getenv("BBB_ROOM_HUB_HOST")
 	port := os.Getenv("BBB_ROOM_HUB_PORT")
 
-	// If host is set use it, otherwise use default localhost
+	// If host is set use it, otherwise use default 0.0.0.0
 	if host == "" {
-		host = "127.0.0.1"
+		host = "0.0.0.0"
 	}
 
 	// If port is set to use it, otherwise use default 8080
