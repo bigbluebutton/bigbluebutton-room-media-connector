@@ -365,7 +365,7 @@ func handleVerificationResponse(roomConn *websocket.Conn) bool {
 		err = json.Unmarshal(msg, &verificationCodeResponseMessage)
 		if err != nil || verificationCodeResponseMessage.Type != MessageTypeVerificationCodeResponse {
 			if verificationCodeResponseMessage.Type != MessageTypePing {
-				log.Printf("Error parsing VerificationCodeResponse: %s", err)
+				log.Printf("Error parsing VerificationCodeResponse: %s", msg)
 			}
 			continue
 		}
