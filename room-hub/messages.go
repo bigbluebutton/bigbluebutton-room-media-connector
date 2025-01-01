@@ -20,9 +20,15 @@ const (
 	MessageTypeVerificationCodeAccepted MessageType = "VerificationCodeAccepted" // the server sends a message to the plugin that the verification code was accepted and the config
 	MessageTypeVerificationCodeRejected MessageType = "VerificationCodeRejected" //  the server sends a message to the plugin that the verification code was not accepted
 	MessageTypeJoinURLs                 MessageType = "JoinURLs"                 // the plugin generates join urls for the room appliance, this message is send from the plugin to the server and then forwarded to the appliance
+	MessageTypeRoomDisconnected         MessageType = "RoomDisconnected"         // the server sends a message to the plugin that the room appliance has disconnected
+	MessageTypePluginDisconnected       MessageType = "PluginDisconnected"       // the server sends a message to the plugin that the plugin has disconnected
 )
 
 // Messages
+type BaseMessage struct {
+	Type MessageType `json:"type" validate:"required"`
+}
+
 type PingMessage struct {
 	Type MessageType `json:"type" validate:"required"`
 }
@@ -101,4 +107,14 @@ type JoinURLsMessage struct {
 type JoinURLs struct {
 	ControlURL string                 `json:"control" validate:"required"`
 	ScreenURLs map[string]interface{} `json:"screens" validate:"required"`
+}
+
+// Room Disconnected Message
+type RoomDisconnectedMessage struct {
+	Type MessageType `json:"type" validate:"required"`
+}
+
+// Plugin Disconnected Message
+type PluginDisconnectedMessage struct {
+	Type MessageType `json:"type" validate:"required"`
 }

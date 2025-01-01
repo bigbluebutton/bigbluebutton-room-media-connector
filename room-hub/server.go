@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -49,19 +50,30 @@ var upgrader = websocket.Upgrader{
 type ConnectionManager struct {
 	sync.Mutex
 	rooms     map[string]*Room
+	plugins   map[string]*Plugin
 	pinToRoom map[string]string // Used to look up roomID via room PIN
 }
 
 // Struct to store room connection and configuration
 type Room struct {
+	Id         string
 	Conn       *websocket.Conn
+	PluginID   string
 	Config     RoomConfig
-	StopPinGen chan struct{}
+	State      string
+	StopPinGen context.CancelFunc
+}
+
+type Plugin struct {
+	Id     string
+	RoomID string
+	Conn   *websocket.Conn
 }
 
 // Initialize ConnectionManager instance
 var connManager = &ConnectionManager{
 	rooms:     make(map[string]*Room),
+	plugins:   make(map[string]*Plugin),
 	pinToRoom: make(map[string]string),
 }
 
@@ -92,7 +104,7 @@ func generateVerificationCode() (string, error) {
 	return randomString(length, ASCIILettersUppercase+Digits)
 }
 
-func rotatePIN(roomID string, oldPIN string, roomConn *websocket.Conn) (newPIN string) {
+func rotatePIN(room *Room, oldPIN string) (newPIN string) {
 	connManager.Lock()
 	// Generate a new PIN
 	newPIN, err := generatePIN()
@@ -101,24 +113,24 @@ func rotatePIN(roomID string, oldPIN string, roomConn *websocket.Conn) (newPIN s
 		connManager.Unlock()
 		return oldPIN
 	}
-	connManager.pinToRoom[newPIN] = roomID
+	connManager.pinToRoom[newPIN] = room.Id
 	// Remove the old pin from mapping
 	delete(connManager.pinToRoom, oldPIN)
 	connManager.Unlock()
 
 	roomPINMessageJSON, err := createPairingPINMessage(newPIN)
 	if err != nil {
-		roomConn.Close()
+		room.Conn.Close()
 		return ""
 	}
 
-	if err := roomConn.WriteMessage(websocket.TextMessage, roomPINMessageJSON); err != nil {
+	if err := room.Conn.WriteMessage(websocket.TextMessage, roomPINMessageJSON); err != nil {
 		log.Println("write error:", err)
-		roomConn.Close()
+		room.Conn.Close()
 		return ""
 	}
 
-	log.Printf("Rotated PIN for roomId: %s, pin: %s", roomID, newPIN)
+	log.Printf("Rotated PIN for roomId: %s, pin: %s", room.Id, newPIN)
 	return newPIN
 }
 
@@ -151,99 +163,256 @@ func roomHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for {
-		_, msg, err := roomConn.ReadMessage()
-		if err != nil {
-			log.Println("read error:", err)
-			roomConn.Close()
-			return
-		}
-
-		// Proceed with the existing logic for MessageTypeRegisterRoom
-		var registerRoomMessage RegisterRoomMessage
-
-		err = json.Unmarshal(msg, &registerRoomMessage)
-		if err != nil || registerRoomMessage.Type != MessageTypeRegisterRoom {
-			if registerRoomMessage.Type != MessageTypePing {
-				log.Printf("Error unmarshalling RegisterRoomMessage: %s", err)
-			}
-			continue
-		}
-
-		err = validate.Struct(registerRoomMessage)
-		if err != nil {
-			log.Printf("Error validating RegisterRoomMessage: %s", err)
-			continue
-		}
-
-		handleRegisterRoomMessage(roomConn, registerRoomMessage)
-	}
-}
-
-func handleRegisterRoomMessage(roomConn *websocket.Conn, msg RegisterRoomMessage) {
-
 	// Generate room ID
-	roomID := uuid.New().String()
-
-	// Generate PIN
-	pin, err := generatePIN()
-	if err != nil {
-		log.Println("Error generating PIN:", err)
-		// TODO error handling, let application know that room creation failed and should try again
-		err := roomConn.Close()
-		if err != nil {
-			log.Println("Failed to close connection")
-			return
-		}
-		log.Println("Closed connection")
-		return
-	}
-
-	log.Println("RoomConfig:", msg.RoomConfig)
+	var roomID = uuid.New().String()
 
 	room := &Room{
-		Conn:       roomConn,
-		Config:     msg.RoomConfig,
-		StopPinGen: make(chan struct{}),
+		Id:    roomID,
+		Conn:  roomConn,
+		State: "new",
 	}
 
 	connManager.Lock()
 	connManager.rooms[roomID] = room
-	connManager.pinToRoom[pin] = roomID
 	connManager.Unlock()
 
-	log.Printf("Registered room with ID: %s", roomID)
+	// Handle incoming messages from the room
+	for {
+		_, msg, err := roomConn.ReadMessage()
+		if err != nil {
+			log.Println("read error:", err)
+
+			handleRoomDisconnect(room)
+
+			return
+		}
+
+		// Check if message can be parsed into the base format all messages use
+		var baseMessage BaseMessage
+		err = json.Unmarshal(msg, &baseMessage)
+		if err != nil {
+			log.Printf("Error parsing message: %s", msg)
+			continue
+		}
+		err = validate.Struct(baseMessage)
+		if err != nil {
+			log.Printf("Message format invalid: %s", err)
+			continue
+		}
+
+		// Ignore ping messages
+		if baseMessage.Type == MessageTypePing {
+			continue
+		}
+
+		// Depending on the state of the room only handle messages with the correct type
+		switch room.State {
+
+		// Room connected to the websocket channel but not ready yet
+		case "new":
+
+			if baseMessage.Type != MessageTypeRegisterRoom {
+				log.Printf("Protocol violation: Room must register itself first")
+				continue
+			}
+
+			// Try to cast the message to a RegisterRoomMessage
+			var registerRoomMessage RegisterRoomMessage
+			err = json.Unmarshal(msg, &registerRoomMessage)
+			if err != nil {
+				log.Printf("Error unmarshalling to RegisterRoomMessage: %s", err)
+				continue
+			}
+
+			err = validate.Struct(registerRoomMessage)
+			if err != nil {
+				log.Printf("Error validating RegisterRoomMessage: %s", err)
+				continue
+			}
+
+			log.Println("RoomConfig:", registerRoomMessage.RoomConfig)
+			room.Config = registerRoomMessage.RoomConfig
+
+			result := registerRoom(room)
+			if result {
+				room.State = "ready"
+			}
+
+			break
+		case "ready":
+			// Room is waiting for a plugin to connect
+			// do nothing
+			break
+		case "verifying":
+			// Plugin connected with pin
+			// waiting for room to verify the connection
+
+			if baseMessage.Type != MessageTypeVerificationCodeResponse {
+				log.Printf("Protocol violation: Room must respond to verification")
+				continue
+			}
+
+			// Try to cast the message to a RegisterRoomMessage
+			var verificationCodeResponseMessage VerificationCodeResponseMessage
+			err = json.Unmarshal(msg, &verificationCodeResponseMessage)
+			if err != nil {
+				log.Printf("Error unmarshalling to VerificationCodeResponseMessage: %s", err)
+				continue
+			}
+
+			err = validate.Struct(verificationCodeResponseMessage)
+			if err != nil {
+				log.Printf("Error validating VerificationCodeResponseMessage: %s", err)
+				continue
+			}
+
+			result, err := handleVerificationCodeResponseMessage(room, verificationCodeResponseMessage)
+			if err != nil {
+				log.Println("Error handling verification code response message:", err)
+				break
+			}
+
+			if result {
+				room.State = "verified"
+			} else {
+				// If verification failed, reset to ready state
+				result := registerRoom(room)
+				if result {
+					room.State = "ready"
+				}
+			}
+
+			break
+
+		case "connected":
+			// Room is connected to a plugin
+			// Forward messages between the two connections
+
+			// TODO move this to a separate function
+
+			// Get plugin
+			connManager.Lock()
+			plugin := connManager.plugins[room.PluginID]
+			connManager.Unlock()
+
+			if err := plugin.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+				log.Println("write error:", err)
+				handlePluginDisconnect(plugin)
+			}
+
+			break
+		}
+	}
+}
+
+func handleVerificationCodeResponseMessage(room *Room, msg VerificationCodeResponseMessage) (bool, error) {
+	status := msg.Status
+
+	// Get plugin
+	connManager.Lock()
+	plugin := connManager.plugins[room.PluginID]
+	connManager.Unlock()
+
+	if status {
+		// Send VerificationCodeAcceptedMessage to plugin
+		verificationCodeAcceptedMessage := VerificationCodeAcceptedMessage{
+			Type:       MessageTypeVerificationCodeAccepted,
+			RoomConfig: room.Config,
+		}
+		verificationCodeAcceptedMessageJSON, _ := json.Marshal(verificationCodeAcceptedMessage)
+
+		if err := plugin.Conn.WriteMessage(websocket.TextMessage, verificationCodeAcceptedMessageJSON); err != nil {
+			log.Println("write error to plugin:", err)
+			handlePluginDisconnect(plugin)
+			return false, err
+		}
+		log.Println("verification code accepted")
+
+		return true, nil
+	} else {
+		// Send VerificationCodeRejectedMessage to plugin
+		verificationCodeRejectedMessage := VerificationCodeRejectedMessage{
+			Type: MessageTypeVerificationCodeRejected,
+		}
+		verificationCodeRejectedMessageJSON, _ := json.Marshal(verificationCodeRejectedMessage)
+
+		if err := plugin.Conn.WriteMessage(websocket.TextMessage, verificationCodeRejectedMessageJSON); err != nil {
+			log.Println("write error to plugin:", err)
+			handlePluginDisconnect(plugin)
+			return false, err
+		}
+
+		// Reset plugin roomID
+		plugin.RoomID = ""
+
+		return false, nil
+	}
+}
+
+func registerRoom(room *Room) bool {
+	// Generate PIN
+	pin, err := generatePIN()
+	if err != nil {
+		log.Println("Error generating PIN:", err)
+		handleRoomDisconnect(room)
+		return false
+	}
+
+	connManager.Lock()
+	connManager.pinToRoom[pin] = room.Id
+	connManager.Unlock()
 
 	// Create RoomPINMessage
 	roomPINMessageJSON, err := createPairingPINMessage(pin)
 	if err != nil {
-		roomConn.Close()
-		return
+		room.Conn.Close()
+		// Remove room from connection manager
+		connManager.Lock()
+		delete(connManager.rooms, room.Id)
+		delete(connManager.pinToRoom, pin)
+		connManager.Unlock()
+		return false
 	}
 
-	if err := roomConn.WriteMessage(websocket.TextMessage, roomPINMessageJSON); err != nil {
+	if err := room.Conn.WriteMessage(websocket.TextMessage, roomPINMessageJSON); err != nil {
 		log.Println("write error:", err)
-		roomConn.Close()
-		return
+		room.Conn.Close()
+
+		// Remove room from connection manager
+		connManager.Lock()
+		delete(connManager.rooms, room.Id)
+		delete(connManager.pinToRoom, pin)
+		connManager.Unlock()
+		return false
 	}
 
-	log.Printf("Room connected with pin: %s, roomID: %s", pin, roomID)
+	log.Printf("Room connected with pin: %s, roomID: %s", pin, room.Id)
 
 	currentPIN := pin
+
+	ctx, cancel := context.WithCancel(context.Background())
+
 	go func() {
-		stopChan := connManager.rooms[roomID].StopPinGen
+		defer cancel()
+		ticker := time.NewTicker(pinRotationInterval * time.Second)
+		defer ticker.Stop()
+
 		for {
 			select {
-			case <-stopChan:
-				log.Println("Stopped PIN generation for roomID:", roomID)
+			case <-ctx.Done():
 				return
-			case <-time.After(pinRotationInterval * time.Second):
-				newPIN := rotatePIN(roomID, currentPIN, roomConn)
+
+			case <-ticker.C:
+				newPIN := rotatePIN(room, currentPIN)
 				currentPIN = newPIN
 			}
 		}
 	}()
-	select {}
+
+	room.StopPinGen = cancel
+
+	return true
+
 }
 
 func pluginHandler(w http.ResponseWriter, r *http.Request) {
@@ -256,131 +425,171 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Generate plugin ID
+	var pluginID = uuid.New().String()
+
+	plugin := &Plugin{
+		Id:   pluginID,
+		Conn: pluginConn,
+	}
+
+	connManager.Lock()
+	connManager.plugins[pluginID] = plugin
+	connManager.Unlock()
+
 	for {
 		_, msg, err := pluginConn.ReadMessage()
 		if err != nil {
 			log.Println("read error:", err)
-			pluginConn.Close()
+			handlePluginDisconnect(plugin)
 			return
 		}
 
-		// First message of plugin must be PairingPINUserInputMessage
-		var pairingPINUserInputMessage PairingPINUserInputMessage
-		err = json.Unmarshal(msg, &pairingPINUserInputMessage)
-		if err != nil || pairingPINUserInputMessage.Type != MessageTypePairingPINUserInput {
-			if pairingPINUserInputMessage.Type != MessageTypePing {
-				log.Printf("Error parsing PairingPINUserInputMessage: %s", msg)
-			}
-			continue
-		}
-
-		err = validate.Struct(pairingPINUserInputMessage)
+		// Check if message can be parsed into the base format all messages use
+		var baseMessage BaseMessage
+		err = json.Unmarshal(msg, &baseMessage)
 		if err != nil {
-			log.Printf("Error validating PairingPINUserInputMessage: %s", err)
+			log.Printf("Error parsing message: %s", msg)
+			continue
+		}
+		err = validate.Struct(baseMessage)
+		if err != nil {
+			log.Printf("Message format invalid: %s", err)
 			continue
 		}
 
-		room := handlePairingPINMessage(pluginConn, pairingPINUserInputMessage)
+		// Ignore ping messages
+		if baseMessage.Type == MessageTypePing {
+			continue
+		}
 
-		// room is null (invalid pin) wait for another attempt
+		// Depending on the state of the plugin only handle messages with the correct type
+
+		// Find room plugin is connected to
+		connManager.Lock()
+		room := connManager.rooms[plugin.RoomID]
+		connManager.Unlock()
+
+		// If not connected to a room
 		if room == nil {
-			continue
-		}
 
-		verified := handleRoomVerification(pluginConn, room)
-
-		// if connection was not verified, wait for new connection attempt
-		if verified == false {
-			continue
-		}
-
-		forwardedLinks := handleRoomLinksMessage(pluginConn, room)
-
-		if forwardedLinks == false {
-			log.Println("Error forwarding room links")
-			// TODO Error message, start all over again
-			continue
-		}
-
-		log.Println("Successfully forwarded room links")
-
-		// TODO: implement full websocket connection between plugin and room
-
-		done := make(chan struct{})
-		var once sync.Once
-		go processMessageForwarding(room.Conn, pluginConn, done, &once)
-		go processMessageForwarding(pluginConn, room.Conn, done, &once)
-
-		return
-	}
-}
-
-func handleRoomLinksMessage(pluginConn *websocket.Conn, room *Room) bool {
-	for {
-		_, msg, err := pluginConn.ReadMessage()
-		if err != nil {
-			log.Println("read error:", err)
-			pluginConn.Close()
-			return false
-		}
-
-		// Unmarshal the received message into the JoinURLsMessage struct
-		var joinURLsMessage JoinURLsMessage
-		err = json.Unmarshal(msg, &joinURLsMessage)
-		if err != nil || joinURLsMessage.Type != MessageTypeJoinURLs {
-			if joinURLsMessage.Type != MessageTypePing {
-				log.Printf("Error parsing joinURLsMessage: %s", msg)
+			// Only listen to PairingPINUserInputMessage ignore all else
+			if baseMessage.Type != MessageTypePairingPINUserInput {
+				log.Printf("Protocol violation: Plugin must connect to a room first")
+				continue
 			}
-			continue
-		}
 
-		err = validate.Struct(joinURLsMessage)
-		if err != nil {
-			log.Printf("Error validating JoinURLsMessage: %s", err)
-			continue
-		}
-
-		// Forward the JoinURLs message to the room
-		roomConn := room.Conn
-		if err := roomConn.WriteMessage(websocket.TextMessage, msg); err != nil {
-			log.Println("write error to room:", err)
-			roomConn.Close()
-			return false
-		}
-
-		return true
-	}
-}
-
-func handleVerificationResponse(roomConn *websocket.Conn) bool {
-	for {
-		_, msg, err := roomConn.ReadMessage()
-		if err != nil {
-			log.Println("read error:", err)
-			roomConn.Close()
-			return false
-		}
-
-		var verificationCodeResponseMessage VerificationCodeResponseMessage
-		err = json.Unmarshal(msg, &verificationCodeResponseMessage)
-		if err != nil || verificationCodeResponseMessage.Type != MessageTypeVerificationCodeResponse {
-			if verificationCodeResponseMessage.Type != MessageTypePing {
-				log.Printf("Error parsing VerificationCodeResponse: %s", msg)
+			// Try to cast the message to a PairingPINUserInputMessage
+			var pairingPINUserInputMessage PairingPINUserInputMessage
+			err = json.Unmarshal(msg, &pairingPINUserInputMessage)
+			if err != nil {
+				log.Printf("Error unmarshalling to PairingPINUserInputMessage: %s", err)
+				continue
 			}
-			continue
-		}
 
-		err = validate.Struct(verificationCodeResponseMessage)
-		if err != nil {
-			log.Printf("Error validating VerificationCodeResponseMessage: %s", err)
-			continue
-		}
+			err = validate.Struct(pairingPINUserInputMessage)
+			if err != nil {
+				log.Printf("Error validating PairingPINUserInputMessage: %s", err)
+				continue
+			}
 
-		return verificationCodeResponseMessage.Status
+			room := handlePairingPINMessage(plugin, pairingPINUserInputMessage)
+			// room is null (invalid pin) wait for another attempt
+			if room == nil {
+				continue
+			}
+
+			plugin.RoomID = room.Id
+			room.PluginID = plugin.Id
+			log.Println("Connected to room with ID: ", room.Id)
+
+			success := handleRoomVerification(plugin)
+			if success {
+				// Room is in verifying state
+				room.State = "verifying"
+			} else {
+				// Failed to enter verifying state
+				// TODO: Error handling, reset state
+			}
+
+		} else {
+			// Connected to a room
+
+			switch room.State {
+
+			// Room is verified
+			case "verified":
+				// Only listen to JoinURLsMessage ignore all else
+				if baseMessage.Type != MessageTypeJoinURLs {
+					log.Printf("Protocol violation: Plugin must send join URLs")
+					continue
+				}
+
+				// Try to cast the message to a JoinURLsMessage
+				var joinURLsMessage JoinURLsMessage
+				err = json.Unmarshal(msg, &joinURLsMessage)
+				if err != nil {
+					log.Printf("Error unmarshalling to JoinURLsMessage: %s", err)
+					continue
+				}
+
+				err = validate.Struct(joinURLsMessage)
+				if err != nil {
+					log.Printf("Error validating JoinURLsMessage: %s", err)
+					continue
+				}
+
+				forwardedLinks := handleRoomLinksMessage(plugin, joinURLsMessage)
+
+				if forwardedLinks == false {
+					log.Println("Error forwarding room links")
+					continue
+				}
+
+				log.Println("Successfully forwarded room links")
+
+				// Room is connected to a plugin
+				// Change state to connected
+				room.State = "connected"
+
+				break
+			case "connected":
+				// Room is connected to a plugin
+				// Forward messages between the two connections
+
+				// TODO move this to a separate function
+
+				if err := room.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+					log.Println("write error:", err)
+					handleRoomDisconnect(room)
+				}
+
+				break
+			}
+
+		}
 	}
 }
 
-func handlePairingPINMessage(pluginConn *websocket.Conn, pairingPINUserInputMessage PairingPINUserInputMessage) *Room {
+func handleRoomLinksMessage(plugin *Plugin, msg JoinURLsMessage) bool {
+	// Get room
+	connManager.Lock()
+	room := connManager.rooms[plugin.RoomID]
+	connManager.Unlock()
+
+	// Forward the JoinURLs message to the room
+	roomConn := room.Conn
+	messageJSON, _ := json.Marshal(msg)
+	if err := roomConn.WriteMessage(websocket.TextMessage, messageJSON); err != nil {
+		log.Println("write error to room:", err)
+		handleRoomDisconnect(room)
+		return false
+	}
+
+	return true
+}
+
+func handlePairingPINMessage(plugin *Plugin, pairingPINUserInputMessage PairingPINUserInputMessage) *Room {
 	pin := pairingPINUserInputMessage.PIN
 
 	connManager.Lock()
@@ -396,9 +605,9 @@ func handlePairingPINMessage(pluginConn *websocket.Conn, pairingPINUserInputMess
 
 		messageJSON, _ := json.Marshal(message)
 
-		if err := pluginConn.WriteMessage(websocket.TextMessage, messageJSON); err != nil {
+		if err := plugin.Conn.WriteMessage(websocket.TextMessage, messageJSON); err != nil {
 			log.Println("write error:", err)
-			pluginConn.Close()
+			plugin.Conn.Close()
 		}
 
 		return nil
@@ -410,8 +619,7 @@ func handlePairingPINMessage(pluginConn *websocket.Conn, pairingPINUserInputMess
 	delete(connManager.pinToRoom, pin)
 
 	// Stop further PIN rotations
-	stopChan := connManager.rooms[roomID].StopPinGen
-	close(stopChan)
+	connManager.rooms[roomID].StopPinGen()
 	connManager.Unlock()
 
 	log.Printf("Resolved room with roomID: %s for pin: %s", roomID, pin)
@@ -419,11 +627,116 @@ func handlePairingPINMessage(pluginConn *websocket.Conn, pairingPINUserInputMess
 	return room
 }
 
-func handleRoomVerification(pluginConn *websocket.Conn, room *Room) bool {
-	roomConn := room.Conn
-	roomConfig := room.Config
+func handleRoomDisconnect(room *Room) {
+	log.Printf("Room disconnected with ID: %s", room.Id)
 
-	log.Printf("Room config: %s", roomConfig) // Access the RoomConfig here
+	// Room disconnected, close the connection
+	room.Conn.Close()
+
+	log.Printf("Connection closed, start cleanup")
+
+	// If room is ready, stop PIN generation
+	if room.State == "ready" {
+		log.Println("Stop pin gen")
+		// Stop PIN generation
+		room.StopPinGen()
+	}
+
+	// If room is registered, remove it from the connection manager
+	if room.State != "new" {
+
+		log.Printf("Remove room from connection manager")
+		connManager.Lock()
+		delete(connManager.rooms, room.Id)
+		connManager.Unlock()
+	}
+
+	log.Println("Check if room was connected to a plugin")
+	// If room is connected to a plugin, notify the plugin
+	connManager.Lock()
+	plugin := connManager.plugins[room.PluginID]
+	connManager.Unlock()
+
+	log.Printf("Plugin ID: %s", room.PluginID)
+
+	if plugin != nil {
+		// Send RoomDisconnected message to plugin
+		roomDisconnectedMessage := RoomDisconnectedMessage{
+			Type: MessageTypeRoomDisconnected,
+		}
+		roomDisconnectedMessageJSON, _ := json.Marshal(roomDisconnectedMessage)
+
+		if err := plugin.Conn.WriteMessage(websocket.TextMessage, roomDisconnectedMessageJSON); err != nil {
+			log.Println("write error to plugin:", err)
+			handlePluginDisconnect(plugin)
+		}
+
+		// Reset plugin roomID
+		plugin.RoomID = ""
+
+	}
+
+	// Remove room from connection manager
+	connManager.Lock()
+	delete(connManager.rooms, room.Id)
+	connManager.Unlock()
+
+	log.Printf("Room removed from connection manager")
+}
+
+func handlePluginDisconnect(plugin *Plugin) {
+	log.Printf("Plugin disconnected with ID: %s", plugin.Id)
+
+	// Plugin disconnected, close the connection
+	plugin.Conn.Close()
+
+	log.Printf("Connection closed, start cleanup")
+
+	// Check if plugin was connected to a room
+	if plugin.RoomID != "" {
+		// Get room
+		connManager.Lock()
+		room := connManager.rooms[plugin.RoomID]
+		connManager.Unlock()
+
+		// If room is connected to the plugin, notify the room
+		if room != nil {
+			// Send PluginDisconnected message to room
+			pluginDisconnectedMessage := PluginDisconnectedMessage{
+				Type: MessageTypePluginDisconnected,
+			}
+			pluginDisconnectedMessageJSON, _ := json.Marshal(pluginDisconnectedMessage)
+
+			if err := room.Conn.WriteMessage(websocket.TextMessage, pluginDisconnectedMessageJSON); err != nil {
+				log.Println("write error to room:", err)
+				handleRoomDisconnect(room)
+			} else {
+				// Reset room pluginID
+				room.PluginID = ""
+
+				// Reset room state to ready
+				result := registerRoom(room)
+				if result {
+					room.State = "ready"
+				}
+			}
+
+		}
+	}
+
+	// Remove plugin from connection manager
+	connManager.Lock()
+	delete(connManager.plugins, plugin.Id)
+	connManager.Unlock()
+}
+
+func handleRoomVerification(plugin *Plugin) bool {
+	// Get room
+	connManager.Lock()
+	room := connManager.rooms[plugin.RoomID]
+	connManager.Unlock()
+
+	roomConn := room.Conn
 
 	// Generate verification code
 	var verificationCode, _ = generateVerificationCode()
@@ -438,9 +751,9 @@ func handleRoomVerification(pluginConn *websocket.Conn, room *Room) bool {
 	pairingPINFoundMessageJSON, _ := json.Marshal(pairingPINFoundMessage)
 
 	// Send PairingPINFound message to plugin
-	if err := pluginConn.WriteMessage(websocket.TextMessage, pairingPINFoundMessageJSON); err != nil {
+	if err := plugin.Conn.WriteMessage(websocket.TextMessage, pairingPINFoundMessageJSON); err != nil {
 		log.Println("write error to room:", err)
-		roomConn.Close()
+		handlePluginDisconnect(plugin)
 		return false
 	}
 
@@ -454,44 +767,11 @@ func handleRoomVerification(pluginConn *websocket.Conn, room *Room) bool {
 	// Send VerificationCodeMessage to room
 	if err := roomConn.WriteMessage(websocket.TextMessage, verificationCodeMessageJSON); err != nil {
 		log.Println("write error to room:", err)
-		roomConn.Close()
+		handleRoomDisconnect(room)
 		return false
 	}
 
-	status := handleVerificationResponse(roomConn)
-
-	if status {
-		// Send VerificationCodeAcceptedMessage to plugin
-		verificationCodeAcceptedMessage := VerificationCodeAcceptedMessage{
-			Type:       MessageTypeVerificationCodeAccepted,
-			RoomConfig: roomConfig,
-		}
-		verificationCodeAcceptedMessageJSON, _ := json.Marshal(verificationCodeAcceptedMessage)
-
-		if err := pluginConn.WriteMessage(websocket.TextMessage, verificationCodeAcceptedMessageJSON); err != nil {
-			log.Println("write error to plugin:", err)
-			pluginConn.Close()
-			return false
-		}
-		log.Println("verification code accepted")
-
-		return true
-	} else {
-		// Send VerificationCodeRejectedMessage to plugin
-		verificationCodeRejectedMessage := VerificationCodeRejectedMessage{
-			Type: MessageTypeVerificationCodeRejected,
-		}
-		verificationCodeRejectedMessageJSON, _ := json.Marshal(verificationCodeRejectedMessage)
-
-		if err := pluginConn.WriteMessage(websocket.TextMessage, verificationCodeRejectedMessageJSON); err != nil {
-			log.Println("write error to plugin:", err)
-			pluginConn.Close()
-			return false
-		}
-
-		return false
-	}
-
+	return true
 }
 
 func main() {
