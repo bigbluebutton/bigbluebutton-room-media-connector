@@ -5,11 +5,25 @@
 This pairing brokers the connection between the [BBB HTML plugin](../html-plugin/) and the [appliance application](../appliance-application/)
 to connect the device that is installed in a physical lecture room into the running BigBlueButton meeting.
 
-## Running the Server from source
+
+## Running the Server in production
 
 TODO
 
-### Connecting to the other Components
+## Build and run the Server from source
+
+```bash
+docker build -t bbb-room-hub .
+docker run -d -p 127.0.0.1:8080:8080 bbb-room-hub
+```
+
+## Running the Server in development
+
+```bash
+go run *.go
+```
+
+## Connecting to the other Components
 
 The communication with the BBB server requires TLS.
 So in order to get this to work with the HTML plugin and the appliance application you need to proxy
@@ -26,7 +40,3 @@ location /hybrid {
   proxy_set_header Connection "Upgrade";
 }
 ```
-
-## Running the Server in production
-
-TODO

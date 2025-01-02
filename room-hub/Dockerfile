@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine as builder
+FROM golang:1.21-alpine AS builder
 
 WORKDIR /proj
 
@@ -8,12 +8,12 @@ RUN go mod download
 
 COPY *.go ./
 
-RUN go build -o bbb-room-hub
+RUN go build
 
 FROM scratch
 
-COPY --from=builder /proj/bbb-room-hub /bbb-room-hub
+COPY --from=builder /proj/server /server
 
 EXPOSE 8080
 
-CMD [ "/bbb-room-hub" ]
+CMD [ "/server", "-host=0.0.0.0" ]
