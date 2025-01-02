@@ -1,10 +1,12 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/websocket"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
 )
@@ -23,6 +25,23 @@ var connManager = &ConnectionManager{
 	rooms:     make(map[string]*Room),
 	plugins:   make(map[string]*Plugin),
 	pinToRoom: make(map[string]string),
+}
+
+// generate a random string of given length from a given character set
+const Digits string = "0123456789"
+const ASCIILettersUppercase string = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func randomString(length int, characterSet string) (string, error) {
+	var generatedString = ""
+	for j := 0; j < length; j++ {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(characterSet))))
+		if err != nil {
+			log.Printf("failed to generate random string: %s", err)
+			return "", err
+		}
+		generatedString += string(characterSet[n.Int64()])
+	}
+	return generatedString, nil
 }
 
 func roomHandler(w http.ResponseWriter, r *http.Request) {

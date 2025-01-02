@@ -2,35 +2,20 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"log"
-	"math/big"
 	"time"
 )
 
 const pinRotationInterval = 10 // Interval in seconds
 
-const Digits string = "0123456789"
-const ASCIILettersUppercase string = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-// generate a random string of given length from a given character set
-func randomString(length int, characterSet string) (string, error) {
-	var generatedString = ""
-	for j := 0; j < length; j++ {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(characterSet))))
-		if err != nil {
-			log.Printf("failed to generate random string: %s", err)
-			return "", err
-		}
-		generatedString += string(characterSet[n.Int64()])
-	}
-	return generatedString, nil
+func generateVerificationCode() (string, error) {
+	const length int = 4
+	return randomString(length, ASCIILettersUppercase+Digits)
 }
 
-// Struct to store room connection and configuration
 type Room struct {
 	Id         string
 	Conn       *websocket.Conn
@@ -56,11 +41,6 @@ func newRoom(conn *websocket.Conn) *Room {
 
 func (room *Room) getPlugin() *Plugin {
 	return connManager.getPlugin(room.PluginID)
-}
-
-func generateVerificationCode() (string, error) {
-	const length int = 4
-	return randomString(length, ASCIILettersUppercase+Digits)
 }
 
 func (room *Room) rotatePIN() bool {
