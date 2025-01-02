@@ -3,12 +3,13 @@ package main
 import (
 	"crypto/rand"
 	"encoding/json"
+	"flag"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/websocket"
 	"log"
 	"math/big"
 	"net/http"
-	"os"
+	"strconv"
 )
 
 var validate *validator.Validate
@@ -280,26 +281,17 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	host := flag.String("host", "127.0.0.1", "websocket server host")
+	port := flag.Int("port", 8080, "websocket server port")
+	flag.Parse()
+
 	validate = validator.New()
 
 	http.HandleFunc("/ws_room", roomHandler)
 	http.HandleFunc("/ws_plugin", pluginHandler)
 
-	host := os.Getenv("BBB_ROOM_HUB_HOST")
-	port := os.Getenv("BBB_ROOM_HUB_PORT")
-
-	// If host is set use it, otherwise use default 0.0.0.0
-	if host == "" {
-		host = "0.0.0.0"
-	}
-
-	// If port is set to use it, otherwise use default 8080
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Printf("WebSocket server started on %s:%s", host, port)
-	err := http.ListenAndServe(host+":"+port, nil)
+	log.Printf("WebSocket server started on %s:%d", *host, *port)
+	err := http.ListenAndServe(*host+":"+strconv.Itoa(*port), nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
