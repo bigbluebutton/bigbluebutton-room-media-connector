@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rand"
-	"encoding/json"
 	"flag"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/websocket"
@@ -28,6 +27,11 @@ var connManager = &ConnectionManager{
 	pinToRoom: make(map[string]string),
 }
 
+type Client interface {
+	sendMessage(message any) bool
+	disconnect()
+}
+
 // generate a random string of given length from a given character set
 const Digits string = "0123456789"
 const ASCIILettersUppercase string = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -43,6 +47,14 @@ func randomString(length int, characterSet string) (string, error) {
 		generatedString += string(characterSet[n.Int64()])
 	}
 	return generatedString, nil
+}
+
+func sendInvalidMessage(client Client) bool {
+	invalidMessage := InvalidMessage{
+		Type: MessageTypeInvalid,
+	}
+
+	return client.sendMessage(invalidMessage)
 }
 
 func roomHandler(w http.ResponseWriter, r *http.Request) {
@@ -61,27 +73,19 @@ func roomHandler(w http.ResponseWriter, r *http.Request) {
 		_, msg, err := roomConn.ReadMessage()
 		if err != nil {
 			log.Println("read error:", err)
-
 			room.disconnect()
-
 			return
 		}
 
-		// Check if message can be parsed into the base format all messages use
-		var baseMessage BaseMessage
-		err = json.Unmarshal(msg, &baseMessage)
+		message, err := parseMessage(msg)
+
 		if err != nil {
-			log.Printf("Error parsing message: %s", msg)
-			continue
-		}
-		err = validate.Struct(baseMessage)
-		if err != nil {
-			log.Printf("Message format invalid: %s", err)
+			sendInvalidMessage(room)
 			continue
 		}
 
 		// Ignore ping messages
-		if baseMessage.Type == MessageTypePing {
+		if message.Type == MessageTypePing {
 			continue
 		}
 
@@ -91,22 +95,9 @@ func roomHandler(w http.ResponseWriter, r *http.Request) {
 		// Room connected to the websocket channel but not ready yet
 		case "new":
 
-			if baseMessage.Type != MessageTypeRegisterRoom {
-				log.Printf("Protocol violation: Room must register itself first")
-				continue
-			}
-
-			// Try to cast the message to a RegisterRoomMessage
-			var registerRoomMessage RegisterRoomMessage
-			err = json.Unmarshal(msg, &registerRoomMessage)
+			registerRoomMessage, err := unmarshalMessage[RegisterRoomMessage](message, MessageTypeRegisterRoom)
 			if err != nil {
-				log.Printf("Error unmarshalling to RegisterRoomMessage: %s", err)
-				continue
-			}
-
-			err = validate.Struct(registerRoomMessage)
-			if err != nil {
-				log.Printf("Error validating RegisterRoomMessage: %s", err)
+				sendInvalidMessage(room)
 				continue
 			}
 
@@ -117,27 +108,16 @@ func roomHandler(w http.ResponseWriter, r *http.Request) {
 		case "ready":
 			// Room is waiting for a plugin to connect
 			// do nothing
+			log.Printf("Protocol violation: Room must register itself first")
+			sendInvalidMessage(room)
 			break
 		case "verifying":
 			// Plugin connected with pin
 			// waiting for room to verify the connection
 
-			if baseMessage.Type != MessageTypeVerificationCodeResponse {
-				log.Printf("Protocol violation: Room must respond to verification")
-				continue
-			}
-
-			// Try to cast the message to a RegisterRoomMessage
-			var verificationCodeResponseMessage VerificationCodeResponseMessage
-			err = json.Unmarshal(msg, &verificationCodeResponseMessage)
+			verificationCodeResponseMessage, err := unmarshalMessage[VerificationCodeResponseMessage](message, MessageTypeVerificationCodeResponse)
 			if err != nil {
-				log.Printf("Error unmarshalling to VerificationCodeResponseMessage: %s", err)
-				continue
-			}
-
-			err = validate.Struct(verificationCodeResponseMessage)
-			if err != nil {
-				log.Printf("Error validating VerificationCodeResponseMessage: %s", err)
+				sendInvalidMessage(room)
 				continue
 			}
 
@@ -152,9 +132,15 @@ func roomHandler(w http.ResponseWriter, r *http.Request) {
 		case "connected":
 			// Room is connected to a plugin
 
+			dataMessage, err := unmarshalMessage[DataMessage](message, MessageTypeData)
+			if err != nil {
+				sendInvalidMessage(room)
+				continue
+			}
+
 			// Forward messages to the plugin
 			plugin := room.getPlugin()
-			plugin.sendMessage(msg)
+			plugin.sendMessage(dataMessage)
 
 			break
 		}
@@ -183,21 +169,15 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Check if message can be parsed into the base format all messages use
-		var baseMessage BaseMessage
-		err = json.Unmarshal(msg, &baseMessage)
+		message, err := parseMessage(msg)
+
 		if err != nil {
-			log.Printf("Error parsing message: %s", msg)
-			continue
-		}
-		err = validate.Struct(baseMessage)
-		if err != nil {
-			log.Printf("Message format invalid: %s", err)
+			sendInvalidMessage(plugin)
 			continue
 		}
 
 		// Ignore ping messages
-		if baseMessage.Type == MessageTypePing {
+		if message.Type == MessageTypePing {
 			continue
 		}
 
@@ -209,23 +189,9 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 		// If not connected to a room
 		if room == nil {
 
-			// Only listen to PairingPINUserInputMessage ignore all else
-			if baseMessage.Type != MessageTypePairingPINUserInput {
-				log.Printf("Protocol violation: Plugin must connect to a room first")
-				continue
-			}
-
-			// Try to cast the message to a PairingPINUserInputMessage
-			var pairingPINUserInputMessage PairingPINUserInputMessage
-			err = json.Unmarshal(msg, &pairingPINUserInputMessage)
+			pairingPINUserInputMessage, err := unmarshalMessage[PairingPINUserInputMessage](message, MessageTypePairingPINUserInput)
 			if err != nil {
-				log.Printf("Error unmarshalling to PairingPINUserInputMessage: %s", err)
-				continue
-			}
-
-			err = validate.Struct(pairingPINUserInputMessage)
-			if err != nil {
-				log.Printf("Error validating PairingPINUserInputMessage: %s", err)
+				sendInvalidMessage(room)
 				continue
 			}
 
@@ -244,23 +210,10 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 
 			// Room is verified
 			case "verified":
-				// Only listen to JoinURLsMessage ignore all else
-				if baseMessage.Type != MessageTypeJoinURLs {
-					log.Printf("Protocol violation: Plugin must send join URLs")
-					continue
-				}
 
-				// Try to cast the message to a JoinURLsMessage
-				var joinURLsMessage JoinURLsMessage
-				err = json.Unmarshal(msg, &joinURLsMessage)
+				joinURLsMessage, err := unmarshalMessage[JoinURLsMessage](message, MessageTypeJoinURLs)
 				if err != nil {
-					log.Printf("Error unmarshalling to JoinURLsMessage: %s", err)
-					continue
-				}
-
-				err = validate.Struct(joinURLsMessage)
-				if err != nil {
-					log.Printf("Error validating JoinURLsMessage: %s", err)
+					sendInvalidMessage(room)
 					continue
 				}
 
@@ -270,8 +223,14 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 			case "connected":
 				// Room is connected to a plugin
 
+				dataMessage, err := unmarshalMessage[DataMessage](message, MessageTypeData)
+				if err != nil {
+					sendInvalidMessage(room)
+					continue
+				}
+
 				// Forward messages to the room
-				room.sendMessage(msg)
+				room.sendMessage(dataMessage)
 
 				break
 			}

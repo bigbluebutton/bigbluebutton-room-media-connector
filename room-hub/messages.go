@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 )
 
@@ -22,11 +23,14 @@ const (
 	MessageTypeJoinURLs                 MessageType = "JoinURLs"                 // the plugin generates join urls for the room appliance, this message is send from the plugin to the server and then forwarded to the appliance
 	MessageTypeRoomDisconnected         MessageType = "RoomDisconnected"         // the server sends a message to the plugin that the room appliance has disconnected
 	MessageTypePluginDisconnected       MessageType = "PluginDisconnected"       // the server sends a message to the plugin that the plugin has disconnected
+	MessageTypeInvalid                  MessageType = "Invalid"                  // invalid message
+	MessageTypeData                     MessageType = "Data"                     // data message
 )
 
 // Messages
 type BaseMessage struct {
-	Type MessageType `json:"type" validate:"required"`
+	Type       MessageType `json:"type" validate:"required"`
+	rawMessage []byte
 }
 
 type PingMessage struct {
@@ -42,22 +46,6 @@ type RoomConfig struct {
 	BBBUserName string                 `json:"bbb_user_name" validate:"required"`
 	BBBUserID   string                 `json:"bbb_user_id" validate:"required"`
 	Layouts     map[string]interface{} `json:"layouts" validate:"required"`
-}
-
-// creates a PairingPIN message and marshals it to JSON
-func createPairingPINMessage(pin string) ([]byte, error) {
-
-	message := PairingPINMessage{
-		Type: MessageTypePairingPIN,
-		PIN:  pin,
-	}
-
-	messageJSON, err := json.Marshal(message)
-	if err != nil {
-		log.Println("Error marshalling RoomPINMessage:", err)
-		return nil, err
-	}
-	return messageJSON, nil
 }
 
 type PairingPINUserInputMessage struct {
@@ -117,4 +105,56 @@ type RoomDisconnectedMessage struct {
 // Plugin Disconnected Message
 type PluginDisconnectedMessage struct {
 	Type MessageType `json:"type" validate:"required"`
+}
+
+type InvalidMessage struct {
+	Type MessageType `json:"type" validate:"required"`
+}
+
+type DataMessage struct {
+	Type MessageType `json:"type" validate:"required"`
+	Data any         `json:"data" validate:"required"`
+}
+
+func parseMessage(msg []byte) (BaseMessage, error) {
+	// Check if message can be parsed into the base format all messages use
+	var baseMessage BaseMessage
+	baseMessage.rawMessage = msg
+	err := json.Unmarshal(msg, &baseMessage)
+	if err != nil {
+		log.Printf("Error parsing message: %s", msg)
+		baseMessage.Type = MessageTypeInvalid
+		return baseMessage, err
+	}
+	err = validate.Struct(baseMessage)
+	if err != nil {
+		log.Printf("Message format invalid: %s", err)
+		baseMessage.Type = MessageTypeInvalid
+		return baseMessage, err
+	}
+
+	return baseMessage, nil
+}
+
+func unmarshalMessage[T any](baseMessage BaseMessage, msgType MessageType) (T, error) {
+
+	var message T
+	if baseMessage.Type != msgType {
+		log.Printf("Protocol violation: Expected message type %s, got %s", msgType, baseMessage.Type)
+		return message, errors.New("protocol violation")
+	}
+
+	err := json.Unmarshal(baseMessage.rawMessage, &message)
+	if err != nil {
+		log.Printf("Error unmarshalling to %T: %s", message, err)
+		return message, err
+	}
+
+	err = validate.Struct(message)
+	if err != nil {
+		log.Printf("Error validating %T: %s", message, err)
+		return message, err
+	}
+
+	return message, nil
 }

@@ -55,13 +55,12 @@ func (room *Room) rotatePIN() bool {
 	room.PairingPIN = newPIN
 	connManager.addRoomPIN(room)
 
-	roomPINMessageJSON, err := createPairingPINMessage(newPIN)
-	if err != nil {
-		room.disconnect()
-		return false
+	roomPINMessage := PairingPINMessage{
+		Type: MessageTypePairingPIN,
+		PIN:  newPIN,
 	}
 
-	if !room.sendMessage(roomPINMessageJSON) {
+	if !room.sendMessage(roomPINMessage) {
 		return false
 	}
 
@@ -77,9 +76,8 @@ func (room *Room) acceptConnection() {
 		Type:       MessageTypeVerificationCodeAccepted,
 		RoomConfig: room.Config,
 	}
-	verificationCodeAcceptedMessageJSON, _ := json.Marshal(verificationCodeAcceptedMessage)
 
-	if !plugin.sendMessage(verificationCodeAcceptedMessageJSON) {
+	if !plugin.sendMessage(verificationCodeAcceptedMessage) {
 		return
 	}
 
@@ -95,9 +93,8 @@ func (room *Room) rejectConnection() {
 	verificationCodeRejectedMessage := VerificationCodeRejectedMessage{
 		Type: MessageTypeVerificationCodeRejected,
 	}
-	verificationCodeRejectedMessageJSON, _ := json.Marshal(verificationCodeRejectedMessage)
 
-	if !plugin.sendMessage(verificationCodeRejectedMessageJSON) {
+	if !plugin.sendMessage(verificationCodeRejectedMessage) {
 		return
 	}
 
@@ -167,9 +164,8 @@ func (room *Room) disconnect() {
 		roomDisconnectedMessage := RoomDisconnectedMessage{
 			Type: MessageTypeRoomDisconnected,
 		}
-		roomDisconnectedMessageJSON, _ := json.Marshal(roomDisconnectedMessage)
 
-		plugin.sendMessage(roomDisconnectedMessageJSON)
+		plugin.sendMessage(roomDisconnectedMessage)
 
 		// Reset plugin
 		plugin.reset()
@@ -206,10 +202,9 @@ func (room *Room) verifyConnection() {
 		Type:             MessageTypePairingPINFound,
 		VerificationCode: verificationCode,
 	}
-	pairingPINFoundMessageJSON, _ := json.Marshal(pairingPINFoundMessage)
 
 	// Send PairingPINFound message to plugin
-	if !plugin.sendMessage(pairingPINFoundMessageJSON) {
+	if !plugin.sendMessage(pairingPINFoundMessage) {
 		return
 	}
 
@@ -218,10 +213,9 @@ func (room *Room) verifyConnection() {
 		Type:             MessageTypeVerificationCode,
 		VerificationCode: verificationCode,
 	}
-	verificationCodeMessageJSON, _ := json.Marshal(verificationCodeMessage)
 
 	// Send VerificationCodeMessage to room
-	if !room.sendMessage(verificationCodeMessageJSON) {
+	if !room.sendMessage(verificationCodeMessage) {
 		return
 	}
 
@@ -237,8 +231,15 @@ func (room *Room) register(config RoomConfig) {
 	room.startPinGen()
 }
 
-func (room *Room) sendMessage(msg []byte) bool {
-	if err := room.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+func (room *Room) sendMessage(message any) bool {
+
+	messageJSON, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("failed to marshal message")
+		return false
+	}
+
+	if err := room.Conn.WriteMessage(websocket.TextMessage, messageJSON); err != nil {
 		log.Println("write error:", err)
 		room.disconnect()
 		return false
@@ -255,8 +256,7 @@ func (room *Room) connect(joinUrls JoinURLs) {
 		JoinURLs: joinUrls,
 	}
 
-	messageJSON, _ := json.Marshal(joinURLsMessage)
-	if !room.sendMessage(messageJSON) {
+	if !room.sendMessage(joinURLsMessage) {
 		log.Println("Error forwarding room links")
 		return
 	}

@@ -39,9 +39,7 @@ func (plugin *Plugin) pairWithRoom(pin string) *Room {
 			Type: MessageTypePairingPINFailed,
 		}
 
-		messageJSON, _ := json.Marshal(message)
-
-		plugin.sendMessage(messageJSON)
+		plugin.sendMessage(message)
 
 		return nil
 	}
@@ -76,9 +74,8 @@ func (plugin *Plugin) disconnect() {
 			pluginDisconnectedMessage := PluginDisconnectedMessage{
 				Type: MessageTypePluginDisconnected,
 			}
-			pluginDisconnectedMessageJSON, _ := json.Marshal(pluginDisconnectedMessage)
 
-			if room.sendMessage(pluginDisconnectedMessageJSON) {
+			if room.sendMessage(pluginDisconnectedMessage) {
 				// Reset room
 				room.reset()
 			}
@@ -89,8 +86,15 @@ func (plugin *Plugin) disconnect() {
 	connManager.removePlugin(plugin)
 }
 
-func (plugin *Plugin) sendMessage(msg []byte) bool {
-	if err := plugin.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+func (plugin *Plugin) sendMessage(message any) bool {
+
+	messageJSON, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("failed to marshal message")
+		return false
+	}
+
+	if err := plugin.Conn.WriteMessage(websocket.TextMessage, messageJSON); err != nil {
 		log.Println("write error:", err)
 		plugin.disconnect()
 		return false
