@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"log"
+	"github.com/rs/zerolog/log"
+	"net"
 )
 
 type Plugin struct {
@@ -22,6 +23,9 @@ func newPlugin(conn *websocket.Conn) *Plugin {
 		Conn: conn,
 	}
 
+	ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
+	log.Info().Str("plugin", pluginID).Str("ip", ip).Msg("New plugin created")
+
 	return plugin
 }
 
@@ -32,7 +36,7 @@ func (plugin *Plugin) getRoom() *Room {
 func (plugin *Plugin) pairWithRoom(pin string) *Room {
 	room := connManager.getRoomByPIN(pin)
 	if room == nil {
-		log.Printf("Pairing with pin %s failed", pin)
+		log.Warn().Str("plugin", plugin.Id).Msg("Pairing failed, invalid PIN")
 
 		// Respond with an error message
 		message := PairingPINFailedMessage{
@@ -48,61 +52,59 @@ func (plugin *Plugin) pairWithRoom(pin string) *Room {
 
 	plugin.RoomID = room.Id
 
-	log.Printf("Pairing with pin %s started, connecting to roomId %s", pin, room.Id)
+	log.Info().Str("room", room.Id).Str("plugin", plugin.Id).Msg("Pairing successfully")
 
 	room.verifyConnection()
 
 	return room
 }
 
-func (plugin *Plugin) disconnect() {
-	log.Printf("Plugin disconnected with ID: %s", plugin.Id)
+func (plugin *Plugin) close() {
+	log.Warn().Str("plugin", plugin.Id).Msg("Websocket connection closed")
 
 	// Plugin disconnected, close the connection
 	plugin.Conn.Close()
 
-	log.Printf("Connection closed, start cleanup")
-
-	// Check if plugin was connected to a room
-	if plugin.RoomID != "" {
-		// Get room
-		room := plugin.getRoom()
-
-		// If room is connected to the plugin, notify the room
-		if room != nil {
-			// Send PluginDisconnected message to room
-			pluginDisconnectedMessage := PluginDisconnectedMessage{
-				Type: MessageTypePluginDisconnected,
-			}
-
-			if room.sendMessage(pluginDisconnectedMessage) {
-				// Reset room
-				room.reset()
-			}
-		}
-	}
+	plugin.disconnect()
 
 	// Remove plugin from connection manager
 	connManager.removePlugin(plugin)
+}
+
+func (plugin *Plugin) disconnect() {
+	// Get room
+	room := plugin.getRoom()
+
+	// Check if plugin was connected to a room
+	if room != nil {
+		log.Info().Str("plugin", plugin.Id).Str("room", room.Id).Msg("Disconnecting plugin from room")
+
+		// Reset plugin roomID
+		plugin.RoomID = ""
+
+		// Send PluginDisconnected message to room
+		pluginDisconnectedMessage := PluginDisconnectedMessage{
+			Type: MessageTypePluginDisconnected,
+		}
+
+		room.sendMessage(pluginDisconnectedMessage)
+
+		room.disconnect()
+	}
 }
 
 func (plugin *Plugin) sendMessage(message any) bool {
 
 	messageJSON, err := json.Marshal(message)
 	if err != nil {
-		log.Printf("failed to marshal message")
+		log.Error().Err(err).Str("plugin", plugin.Id).Msg("Failed to marshal message")
 		return false
 	}
 
 	if err := plugin.Conn.WriteMessage(websocket.TextMessage, messageJSON); err != nil {
-		log.Println("write error:", err)
-		plugin.disconnect()
+		log.Error().Err(err).Str("plugin", plugin.Id).Msg("Websocket write error")
+		plugin.close()
 		return false
 	}
 	return true
-}
-
-func (plugin *Plugin) reset() {
-	// Reset plugin roomID
-	plugin.RoomID = ""
 }

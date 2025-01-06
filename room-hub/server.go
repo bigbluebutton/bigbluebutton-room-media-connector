@@ -5,10 +5,13 @@ import (
 	"flag"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/websocket"
-	"log"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"math/big"
 	"net/http"
+	"os"
 	"strconv"
+	"time"
 )
 
 var validate *validator.Validate
@@ -30,18 +33,22 @@ var connManager = &ConnectionManager{
 type Client interface {
 	sendMessage(message any) bool
 	disconnect()
+	close()
 }
 
-// generate a random string of given length from a given character set
+// Digits Constant with all digits used for randomString generation
 const Digits string = "0123456789"
+
+// ASCIILettersUppercase Constant with all uppercase ASCII letters used for randomString generation
 const ASCIILettersUppercase string = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
+// randomString generates a random string of the given length from the specified character set.
+// It returns the generated string and an error if the random number generation fails.
 func randomString(length int, characterSet string) (string, error) {
 	var generatedString = ""
 	for j := 0; j < length; j++ {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(characterSet))))
 		if err != nil {
-			log.Printf("failed to generate random string: %s", err)
 			return "", err
 		}
 		generatedString += string(characterSet[n.Int64()])
@@ -49,6 +56,8 @@ func randomString(length int, characterSet string) (string, error) {
 	return generatedString, nil
 }
 
+// sendInvalidMessage sends an InvalidMessage to the specified client.
+// It returns true if the message was sent successfully, otherwise false.
 func sendInvalidMessage(client Client) bool {
 	invalidMessage := InvalidMessage{
 		Type: MessageTypeInvalid,
@@ -57,10 +66,26 @@ func sendInvalidMessage(client Client) bool {
 	return client.sendMessage(invalidMessage)
 }
 
-func roomHandler(w http.ResponseWriter, r *http.Request) {
+func sendPongMessage(client Client) {
+	pongMessage := PongMessage{
+		Type: MessageTypePong,
+	}
+
+	if !client.sendMessage(pongMessage) {
+		client.disconnect()
+	}
+	return
+}
+
+// roomHandler handles WebSocket connections from rooms.
+// It upgrades the HTTP connection to a WebSocket connection and processes incoming messages from the room.
+func roomHandler(w http.ResponseWriter, r *http.Request, timeout int) {
+	// try to upgrade the HTTP connection to a WebSocket connection
 	roomConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("upgrade error:", err)
+		log.Error().
+			Err(err).
+			Msg("Failed to upgrade connection to websocket")
 		return
 	}
 
@@ -70,15 +95,21 @@ func roomHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Handle incoming messages from the room
 	for {
+		roomConn.SetReadDeadline(time.Now().Add(time.Duration(timeout) * time.Second))
 		_, msg, err := roomConn.ReadMessage()
 		if err != nil {
-			log.Println("read error:", err)
-			room.disconnect()
+			log.Error().
+				Str("room_id", room.Id).
+				Err(err).
+				Msg("Websocket read error")
+			room.close()
 			return
 		}
 
+		// Parse the incoming message
 		message, err := parseMessage(msg)
 
+		// If the message could not be parsed, send an InvalidMessage to the room
 		if err != nil {
 			sendInvalidMessage(room)
 			continue
@@ -86,6 +117,7 @@ func roomHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Ignore ping messages
 		if message.Type == MessageTypePing {
+			sendPongMessage(room)
 			continue
 		}
 
@@ -101,14 +133,13 @@ func roomHandler(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			log.Println("RoomConfig:", registerRoomMessage.RoomConfig)
 			room.register(registerRoomMessage.RoomConfig)
 
 			break
 		case "ready":
 			// Room is waiting for a plugin to connect
 			// do nothing
-			log.Printf("Protocol violation: Room must register itself first")
+			log.Warn().Str("type", string(message.Type)).Msg("Protocol violation")
 			sendInvalidMessage(room)
 			break
 		case "verifying":
@@ -132,6 +163,11 @@ func roomHandler(w http.ResponseWriter, r *http.Request) {
 		case "connected":
 			// Room is connected to a plugin
 
+			if message.Type == MessageTypeDisconnect {
+				room.disconnect()
+				continue
+			}
+
 			dataMessage, err := unmarshalMessage[DataMessage](message, MessageTypeData)
 			if err != nil {
 				sendInvalidMessage(room)
@@ -147,13 +183,15 @@ func roomHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func pluginHandler(w http.ResponseWriter, r *http.Request) {
+// pluginHandler handles WebSocket connections from plugins.
+// It upgrades the HTTP connection to a WebSocket connection and processes incoming messages from the plugin.
+func pluginHandler(w http.ResponseWriter, r *http.Request, timeout int) {
 	// pluginHandler to handle WebSocket connections from plugins
 	// handle RoomPINMessage and PairingPINMessage
 
 	pluginConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("upgrade error:", err)
+		log.Warn().Err(err).Msg("upgrade error")
 		return
 	}
 
@@ -162,10 +200,14 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 	connManager.addPlugin(plugin)
 
 	for {
+		pluginConn.SetReadDeadline(time.Now().Add(time.Duration(timeout) * time.Second))
 		_, msg, err := pluginConn.ReadMessage()
 		if err != nil {
-			log.Println("read error:", err)
-			plugin.disconnect()
+			log.Error().
+				Str("plugin_id", plugin.Id).
+				Err(err).
+				Msg("Read error")
+			plugin.close()
 			return
 		}
 
@@ -178,6 +220,7 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Ignore ping messages
 		if message.Type == MessageTypePing {
+			sendPongMessage(plugin)
 			continue
 		}
 
@@ -223,6 +266,11 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 			case "connected":
 				// Room is connected to a plugin
 
+				if message.Type == MessageTypeDisconnect {
+					plugin.disconnect()
+					continue
+				}
+
 				dataMessage, err := unmarshalMessage[DataMessage](message, MessageTypeData)
 				if err != nil {
 					sendInvalidMessage(room)
@@ -239,19 +287,35 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// main is the entry point of the application.
+// It starts the WebSocket server and listens for incoming connections on the specified host and port.
 func main() {
+	// UNIX Time is faster and smaller than most timestamps
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+
+	// Parse command line arguments for host and port
 	host := flag.String("host", "127.0.0.1", "websocket server host")
 	port := flag.Int("port", 8080, "websocket server port")
+	timeout := flag.Int("timeout", 60, "read timeout in seconds")
+	jsonLog := flag.Bool("json_log", true, "log in json format")
 	flag.Parse()
 
 	validate = validator.New()
 
-	http.HandleFunc("/ws_room", roomHandler)
-	http.HandleFunc("/ws_plugin", pluginHandler)
+	if !*jsonLog {
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.TimeOnly})
+	}
 
-	log.Printf("WebSocket server started on %s:%d", *host, *port)
+	http.HandleFunc("/ws_room", func(writer http.ResponseWriter, request *http.Request) {
+		roomHandler(writer, request, *timeout)
+	})
+	http.HandleFunc("/ws_plugin", func(writer http.ResponseWriter, request *http.Request) {
+		pluginHandler(writer, request, *timeout)
+	})
+
+	log.Info().Msg("Server started, listening on " + *host + ":" + strconv.Itoa(*port) + ", read timeout: " + strconv.Itoa(*timeout))
 	err := http.ListenAndServe(*host+":"+strconv.Itoa(*port), nil)
 	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
+		log.Fatal().Err(err).Msg("Failed to start server")
 	}
 }

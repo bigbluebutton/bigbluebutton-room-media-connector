@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"log"
+	"github.com/rs/zerolog/log"
 )
 
 // Define custom types and constants for the Type field
@@ -11,6 +11,7 @@ type MessageType string
 
 const (
 	MessageTypePing                     MessageType = "Ping"                     // ping
+	MessageTypePong                     MessageType = "Pong"                     // pong
 	MessageTypePairingPIN               MessageType = "PairingPIN"               // assign pin to room (server -> appliance)
 	MessageTypeRegisterRoom             MessageType = "RegisterRoom"             // appliance registers with room config (appliance -> server)
 	MessageTypePairingPINUserInput      MessageType = "PairingPINUserInput"      // connect to room (plugin -> server)
@@ -23,6 +24,7 @@ const (
 	MessageTypeJoinURLs                 MessageType = "JoinURLs"                 // the plugin generates join urls for the room appliance, this message is send from the plugin to the server and then forwarded to the appliance
 	MessageTypeRoomDisconnected         MessageType = "RoomDisconnected"         // the server sends a message to the plugin that the room appliance has disconnected
 	MessageTypePluginDisconnected       MessageType = "PluginDisconnected"       // the server sends a message to the plugin that the plugin has disconnected
+	MessageTypeDisconnect               MessageType = "Disconnect"               // disconnect message
 	MessageTypeInvalid                  MessageType = "Invalid"                  // invalid message
 	MessageTypeData                     MessageType = "Data"                     // data message
 )
@@ -34,6 +36,10 @@ type BaseMessage struct {
 }
 
 type PingMessage struct {
+	Type MessageType `json:"type" validate:"required"`
+}
+
+type PongMessage struct {
 	Type MessageType `json:"type" validate:"required"`
 }
 
@@ -107,6 +113,11 @@ type PluginDisconnectedMessage struct {
 	Type MessageType `json:"type" validate:"required"`
 }
 
+// Disconnect Message
+type DisconnectMessage struct {
+	Type MessageType `json:"type" validate:"required"`
+}
+
 type InvalidMessage struct {
 	Type MessageType `json:"type" validate:"required"`
 }
@@ -122,13 +133,13 @@ func parseMessage(msg []byte) (BaseMessage, error) {
 	baseMessage.rawMessage = msg
 	err := json.Unmarshal(msg, &baseMessage)
 	if err != nil {
-		log.Printf("Error parsing message: %s", msg)
+		log.Error().Str("message", string(msg)).Msg("Error parsing message")
 		baseMessage.Type = MessageTypeInvalid
 		return baseMessage, err
 	}
 	err = validate.Struct(baseMessage)
 	if err != nil {
-		log.Printf("Message format invalid: %s", err)
+		log.Error().Str("message", string(msg)).Err(err).Msg("Message format invalid")
 		baseMessage.Type = MessageTypeInvalid
 		return baseMessage, err
 	}
@@ -140,19 +151,19 @@ func unmarshalMessage[T any](baseMessage BaseMessage, msgType MessageType) (T, e
 
 	var message T
 	if baseMessage.Type != msgType {
-		log.Printf("Protocol violation: Expected message type %s, got %s", msgType, baseMessage.Type)
+		log.Warn().Str("expected_type", string(msgType)).Str("type", string(baseMessage.Type)).Msg("Protocol violation")
 		return message, errors.New("protocol violation")
 	}
 
 	err := json.Unmarshal(baseMessage.rawMessage, &message)
 	if err != nil {
-		log.Printf("Error unmarshalling to %T: %s", message, err)
+		log.Error().Err(err).Str("message", string(baseMessage.rawMessage)).Type("type", message).Msg("Error unmarshalling message")
 		return message, err
 	}
 
 	err = validate.Struct(message)
 	if err != nil {
-		log.Printf("Error validating %T: %s", message, err)
+		log.Error().Err(err).Type("message", message).Type("type", message).Msg("Error validating message")
 		return message, err
 	}
 

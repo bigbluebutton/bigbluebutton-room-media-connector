@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"log"
 	"sync"
 )
 
@@ -70,7 +69,6 @@ func (connectionManager *ConnectionManager) generatePIN() (string, error) {
 
 		var pin, err = randomString(PINLength, Digits)
 		if err != nil {
-			log.Printf("failed to generate room ID: %s", err)
 			return "", err
 		}
 
@@ -83,7 +81,7 @@ func (connectionManager *ConnectionManager) generatePIN() (string, error) {
 		}
 	}
 	// No pin generated after maxTries
-	return "", errors.New("PIN generation failed")
+	return "", errors.New("Max tries reached")
 }
 
 // Get room by PIN

@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"log"
+	"github.com/rs/zerolog/log"
+	"net"
 	"time"
 )
 
@@ -36,6 +37,9 @@ func newRoom(conn *websocket.Conn) *Room {
 		State: "new",
 	}
 
+	ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
+	log.Info().Str("room", roomID).Str("ip", ip).Msg("New room created")
+
 	return room
 }
 
@@ -47,7 +51,7 @@ func (room *Room) rotatePIN() bool {
 	// Generate a new PIN
 	newPIN, err := connManager.generatePIN()
 	if err != nil {
-		log.Printf("Error generating PIN for roomID %s, error: %v", room.Id, err)
+		log.Error().Err(err).Str("room", room.Id).Msg("Failed to generate PIN")
 		return false
 	}
 
@@ -64,12 +68,14 @@ func (room *Room) rotatePIN() bool {
 		return false
 	}
 
-	log.Printf("New PIN for roomId: %s, pin: %s", room.Id, newPIN)
+	log.Debug().Str("room", room.Id).Msg("Generated new PIN")
 	return true
 }
 
 func (room *Room) acceptConnection() {
 	plugin := room.getPlugin()
+
+	log.Info().Str("room", room.Id).Str("plugin", plugin.Id).Msg("Connection accepted")
 
 	// Send VerificationCodeAcceptedMessage to plugin
 	verificationCodeAcceptedMessage := VerificationCodeAcceptedMessage{
@@ -81,13 +87,13 @@ func (room *Room) acceptConnection() {
 		return
 	}
 
-	log.Println("verification code accepted")
-
 	room.State = "verified"
 }
 
 func (room *Room) rejectConnection() {
 	plugin := room.getPlugin()
+
+	log.Info().Str("room", room.Id).Str("plugin", plugin.Id).Msg("Connection rejected")
 
 	// Send VerificationCodeRejectedMessage to plugin
 	verificationCodeRejectedMessage := VerificationCodeRejectedMessage{
@@ -98,10 +104,8 @@ func (room *Room) rejectConnection() {
 		return
 	}
 
-	// Reset plugin roomID
-	plugin.reset()
-
-	room.startPinGen()
+	// Disconnect from plugin
+	room.disconnect()
 }
 
 func (room *Room) startPinGen() bool {
@@ -110,7 +114,7 @@ func (room *Room) startPinGen() bool {
 		return false
 	}
 
-	log.Printf("Room roomID: %s ready for pairing with pin: %s,", room.Id, room.PairingPIN)
+	log.Info().Str("room", room.Id).Msg("Ready for pairing")
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -122,6 +126,7 @@ func (room *Room) startPinGen() bool {
 		for {
 			select {
 			case <-ctx.Done():
+				log.Debug().Str("room", room.Id).Msg("PIN generation stopped")
 				return
 
 			case <-ticker.C:
@@ -138,28 +143,37 @@ func (room *Room) startPinGen() bool {
 
 }
 
-func (room *Room) disconnect() {
-	log.Printf("Room disconnected with ID: %s", room.Id)
-
-	// Room disconnected, close the connection
-	room.Conn.Close()
-
-	log.Printf("Connection closed, start cleanup")
+func (room *Room) close() {
+	log.Warn().Str("room", room.Id).Msg("Websocket connection closed")
 
 	// If room is ready, stop PIN generation
 	if room.State == "ready" {
-		log.Println("Stop pin gen")
 		// Stop PIN generation
 		room.StopPinGen()
 	}
 
-	log.Println("Check if room was connected to a plugin")
-	// If room is connected to a plugin, notify the plugin
+	// Room disconnected, close the connection
+	room.Conn.Close()
+
+	room.State = "closing"
+
+	room.disconnect()
+
+	// Remove room from connection manager
+	connManager.removeRoom(room)
+}
+
+func (room *Room) disconnect() {
+	// Get plugin
 	plugin := room.getPlugin()
 
-	log.Printf("Plugin ID: %s", room.PluginID)
-
+	// Check if room was connected to a plugin
 	if plugin != nil {
+		log.Info().Str("room", room.Id).Str("plugin", plugin.Id).Msg("Disconnecting room from plugin")
+
+		// Reset room pluginID
+		room.PluginID = ""
+
 		// Send RoomDisconnected message to plugin
 		roomDisconnectedMessage := RoomDisconnectedMessage{
 			Type: MessageTypeRoomDisconnected,
@@ -168,13 +182,13 @@ func (room *Room) disconnect() {
 		plugin.sendMessage(roomDisconnectedMessage)
 
 		// Reset plugin
-		plugin.reset()
+		plugin.disconnect()
 	}
 
-	// Remove room from connection manager
-	connManager.removeRoom(room)
-
-	log.Printf("Room removed from connection manager")
+	// Reset room state to ready
+	if room.State != "closing" {
+		room.startPinGen()
+	}
 }
 
 func (room *Room) pairWithPlugin(plugin *Plugin) {
@@ -195,7 +209,7 @@ func (room *Room) verifyConnection() {
 	// Generate verification code
 	var verificationCode, _ = generateVerificationCode()
 
-	log.Printf("Verifying connection between roomID %s and pluginID %s: Verification code %s", room.Id, plugin.Id, verificationCode)
+	log.Info().Str("room", room.Id).Str("plugin", plugin.Id).Msg("Verifying connection")
 
 	// Generate PairingPINFound message
 	pairingPINFoundMessage := PairingPINFoundMessage{
@@ -228,6 +242,8 @@ func (room *Room) verifyConnection() {
 func (room *Room) register(config RoomConfig) {
 	room.Config = config
 
+	log.Info().Str("room", room.Id).Msg("Room registered")
+
 	room.startPinGen()
 }
 
@@ -235,13 +251,13 @@ func (room *Room) sendMessage(message any) bool {
 
 	messageJSON, err := json.Marshal(message)
 	if err != nil {
-		log.Printf("failed to marshal message")
+		log.Error().Err(err).Str("room", room.Id).Msg("Failed to marshal message")
 		return false
 	}
 
 	if err := room.Conn.WriteMessage(websocket.TextMessage, messageJSON); err != nil {
-		log.Println("write error:", err)
-		room.disconnect()
+		log.Error().Err(err).Str("room", room.Id).Msg("Websocket write error")
+		room.close()
 		return false
 	}
 
@@ -257,19 +273,10 @@ func (room *Room) connect(joinUrls JoinURLs) {
 	}
 
 	if !room.sendMessage(joinURLsMessage) {
-		log.Println("Error forwarding room links")
 		return
 	}
 
-	log.Println("Successfully forwarded room links")
+	log.Info().Str("room", room.Id).Str("plugin", room.getPlugin().Id).Msg("Connection established, forwarded room links")
 
 	room.State = "connected"
-}
-
-func (room *Room) reset() {
-	// Reset room pluginID
-	room.PluginID = ""
-
-	// Reset room state to ready
-	room.startPinGen()
 }
