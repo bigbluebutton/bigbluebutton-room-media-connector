@@ -1,8 +1,8 @@
 export interface HID {
-  newOffer(accept: () => void, reject: () => void): void;
+  requireVerification(accept: () => void, reject: () => void): void;
 
-  acceptedOffer(): void;
-  rejectedOffer(): void;
+  verificationAccepted(): void;
+  verificationRejected(): void;
 
   connected(leave: () => void): void;
 

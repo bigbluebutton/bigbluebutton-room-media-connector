@@ -4,50 +4,63 @@ import {inject, onMounted, ref} from 'vue';
 import BBBWebSocket from '/@/websocket';
 import LoadingSpinner from '/@/components/LoadingSpinner.vue';
 import ConnectionError from '/@/components/ConnectionError.vue';
-import RoomOffer from '/@/components/RoomOffer.vue';
+import VerifyConnection from '/@/components/VerifyConnection.vue';
 import ConfigMissing from '/@/components/ConfigMissing.vue';
 import {XMarkIcon} from '@heroicons/vue/24/solid';
 
 const config = inject('config');
 
 const pin = ref<string | null>(null);
-const offer = ref<object | null>(null);
+const verificationCode = ref<string | null>(null);
 const ws_connection_failed = ref(false);
 
 const onConnectionChanged = (status: boolean) => {
   ws_connection_failed.value = !status;
 };
 
-const onNewPin = (newPin: string) => {
+const onPairingPin = (newPin: string) => {
   pin.value = newPin;
 };
 
-const onNewOffer = (urls, pairingCode) => {
-  console.log('new offer', urls, pairingCode);
-  offer.value = {urls, pairingCode};
-  window.electronAPI.newOffer();
+const onVerification = (newVerificationCode: string) => {
+  pin.value = null;
+  verificationCode.value = newVerificationCode;
+  window.electronAPI.requireVerification();
 };
 
-window.electronAPI.handleTriggerNewPin(() => {
-  ws.reconnect(config.config.room, 1);
+const onJoinUrls = urls => {
+  window.electronAPI.joinURLs(urls);
+};
+
+window.electronAPI.handleLeftMeeting(() => {
+  ws.disconnectFromPlugin();
 });
 
-const closeApp = () => {
-  window.electronAPI.close();
-};
+window.electronAPI.handleVerificationAccepted(() => {
+  ws.acceptVerification();
+  verificationCode.value = null;
+});
+
+window.electronAPI.handleVerificationRejected(() => {
+  ws.rejectVerification();
+  verificationCode.value = null;
+});
 
 let ws = null;
 
 function connect() {
   ws = new BBBWebSocket(
+    config.config.room,
     config.config.control_server.ws,
     config.config.control_server.reconnect_interval,
     config.config.control_server.ping_interval,
   );
   ws.setConnectionStatusCallback(onConnectionChanged);
-  ws.setNewPinCallback(onNewPin);
-  ws.setOfferCallback(onNewOffer);
-  ws.connect(config.config.room);
+  ws.setPairingPinCallback(onPairingPin);
+  ws.setVerificationCallback(onVerification);
+  ws.setJoinUrlCallback(onJoinUrls);
+  ws.setPluginDisconnectedCallback(onPluginDisconnected);
+  ws.connect();
 }
 
 onMounted(() => {
@@ -56,17 +69,25 @@ onMounted(() => {
   }
 });
 
-function onAcceptOffer() {
-  window.electronAPI.acceptOffer(JSON.parse(JSON.stringify(offer.value)));
-  ws.acceptOffer();
-  offer.value = null;
+function onVerificationAccepted() {
+  window.electronAPI.verificationAccepted();
+  ws.acceptVerification();
+  verificationCode.value = null;
 }
 
-function onRejectOffer() {
-  window.electronAPI.rejectOffer();
-  ws.rejectOffer();
-  offer.value = null;
+function onPluginDisconnected() {
+  window.electronAPI.pluginDisconnected();
 }
+
+function onVerificationRejected() {
+  window.electronAPI.verificationRejected();
+  ws.rejectVerification();
+  verificationCode.value = null;
+}
+
+const closeApp = () => {
+  window.electronAPI.close();
+};
 </script>
 
 <template>
@@ -103,15 +124,16 @@ function onRejectOffer() {
           <connection-error v-if="ws_connection_failed" />
 
           <pairing-code
-            v-if="pin && !offer"
+            v-if="pin && !verificationCode"
             :pin="pin"
           />
 
-          <room-offer
-            v-if="offer"
-            :offer="offer"
-            @accept="onAcceptOffer"
-            @reject="onRejectOffer"
+          <verify-connection
+            v-if="verificationCode"
+            :auto-reject-time="config.config.auto_reject_time"
+            :verification-code="verificationCode"
+            @accept="onVerificationAccepted"
+            @reject="onVerificationRejected"
           />
         </div>
         <config-missing

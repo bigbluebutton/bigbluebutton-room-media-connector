@@ -66,31 +66,32 @@ async function createWindow() {
     return {path, config};
   });
 
-  ipcMain.on('newOffer', () => {
+  ipcMain.on('requireVerification', () => {
     hdiDevices.forEach(device => {
-      device.newOffer(
+      device.requireVerification(
         () => {
-          browserWindow.webContents.send('acceptOffer');
+          browserWindow.webContents.send('acceptVerification');
         },
         () => {
-          browserWindow.webContents.send('rejectOffer');
+          browserWindow.webContents.send('rejectVerification');
         },
       );
     });
   });
 
-  ipcMain.on('close', async () => {
-    app.quit();
-  });
+  ipcMain.on('joinURLs', async (event, joinURLs) => {
+    console.log('joinUrls', joinURLs);
 
-  ipcMain.on('acceptOffer', async (event, offer) => {
-    console.log('acceptOffer', offer);
+    const bbbMeeting = new BBBMeeting(joinURLs.control, joinURLs.screens, displayManager);
 
-    hdiDevices.forEach(device => {
-      device.acceptedOffer();
-    });
-
-    const bbbMeeting = new BBBMeeting(offer.urls.control, offer.urls.screens, displayManager);
+    const pluginDisconnected = async () => {
+      console.log('plugin disconnected');
+      await bbbMeeting.leave();
+      hdiDevices.forEach(device => {
+        device.disconnected();
+      });
+      ipcMain.off('pluginDisconnected', pluginDisconnected);
+    };
 
     const leaveCallback = () => {
       console.log('should leave software');
@@ -99,7 +100,8 @@ async function createWindow() {
         device.disconnected();
       });
 
-      browserWindow.webContents.send('triggerNewPin');
+      browserWindow.webContents.send('leftMeeting');
+      ipcMain.off('pluginDisconnected', pluginDisconnected);
     };
 
     if (!(await bbbMeeting.join(leaveCallback))) {
@@ -107,6 +109,9 @@ async function createWindow() {
     }
 
     console.log('joined');
+
+    ipcMain.on('pluginDisconnected', pluginDisconnected);
+
     hdiDevices.forEach(device => {
       device.connected(async () => {
         console.log('should leave hardware');
@@ -116,16 +121,25 @@ async function createWindow() {
           device.disconnected();
         });
 
-        browserWindow.webContents.send('triggerNewPin');
+        browserWindow.webContents.send('leftMeeting');
+        ipcMain.off('pluginDisconnected', pluginDisconnected);
       });
     });
   });
 
-  ipcMain.on('rejectOffer', () => {
-    console.log('rejectOffer');
+  ipcMain.on('close', async () => {
+    app.quit();
+  });
 
+  ipcMain.on('verificationAccepted', () => {
     hdiDevices.forEach(device => {
-      device.rejectedOffer();
+      device.verificationAccepted();
+    });
+  });
+
+  ipcMain.on('verificationRejected', () => {
+    hdiDevices.forEach(device => {
+      device.verificationRejected();
     });
   });
 
@@ -140,9 +154,9 @@ async function createWindow() {
   browserWindow.on('ready-to-show', () => {
     browserWindow?.show();
 
-    if (import.meta.env.DEV) {
-      //browserWindow?.webContents.openDevTools();
-    }
+    //if (import.meta.env.DEV) {
+    browserWindow?.webContents.openDevTools();
+    //}
   });
 
   /**

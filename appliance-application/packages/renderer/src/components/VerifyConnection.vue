@@ -14,9 +14,9 @@
 
         <div class="mt-3 mb-3">
           <span class="text-base font-semibold leading-6 text-gray-900 mb-3 block"
-            >Pairing Code</span
+            >Verification Code</span
           >
-          <pin-code :pin="offer.pairingCode" />
+          <pin-code :pin="verificationCode" />
         </div>
       </div>
     </div>
@@ -52,24 +52,27 @@
 import PinCode from '/@/components/PinCode.vue';
 import {computed, onMounted, ref} from 'vue';
 
-defineProps({
-  offer: Object,
+const props = defineProps({
+  verificationCode: String,
+  autoRejectTime: {
+    type: Number,
+    default: 10,
+  },
 });
 
 const emit = defineEmits(['accept', 'reject']);
 
-const autoRejectTime = 10;
 const timerInterval = 1 / 100;
 const timer = ref(0);
 
 const autoRejectPercentage = computed(() => {
-  return (timer.value / autoRejectTime) * 100;
+  return (timer.value / props.autoRejectTime) * 100;
 });
 
 let interval = null;
 
 onMounted(() => {
-  timer.value = autoRejectTime;
+  timer.value = props.autoRejectTime;
   interval = setInterval(() => {
     if (timer.value < 0) {
       rejectOffer();
@@ -77,14 +80,6 @@ onMounted(() => {
       timer.value = timer.value - timerInterval;
     }
   }, timerInterval * 1000);
-
-  window.electronAPI.handleAcceptOffer(() => {
-    acceptOffer();
-  });
-
-  window.electronAPI.handleRejectOffer(() => {
-    rejectOffer();
-  });
 });
 
 function acceptOffer() {

@@ -14,7 +14,6 @@ export class BBBMeeting {
 
   private windows: BrowserWindow[];
   private apolloClient: ApolloClient<NormalizedCacheObject>;
-  private user_id: any;
   private bbbGraphQl: BBBGraphql;
 
   constructor(control, screens, displayManager) {
@@ -33,7 +32,6 @@ export class BBBMeeting {
     if (await this.bbbGraphQl.connect()) {
       console.log('connected to graphql');
 
-      this.user_id = this.bbbGraphQl.getUserId();
       this.apolloClient = this.bbbGraphQl.getApolloClient();
 
       this.onUsersLeft(async () => {
@@ -49,29 +47,31 @@ export class BBBMeeting {
   }
 
   private onUsersLeft(callback) {
-    const USER_COUNT = gql`
-      subscription ($userId: String) {
-        user_aggregate(where: {extId: {_nlike: $userId}}) {
-          aggregate {
-            count
-          }
+    const USER_SESSIONS = gql`
+      subscription {
+        user_session(where: {connectionsAlive: {_gt: "0"}}) {
+          connectionsAlive
+          enforceLayout
+          sessionName
+          sessionToken
         }
       }
     `;
 
     this.apolloClient
       .subscribe({
-        query: USER_COUNT,
-        variables: {
-          userId: this.user_id + '%',
-        },
+        query: USER_SESSIONS,
       })
       .subscribe({
         next(data) {
-          const userCount = data.data.user_aggregate.aggregate.count;
+          const userSessions = data.data.user_session;
+          console.log('userSessions', JSON.stringify(userSessions));
 
-          console.log('userCount', userCount);
-          if (userCount == 0) {
+          // Is the original user still in the meeting?
+          // @ts-ignore
+          const isOwnerPresent = userSessions.some(session => session.sessionName == null);
+
+          if (!isOwnerPresent) {
             callback();
           }
         },
@@ -110,8 +110,6 @@ export class BBBMeeting {
       this.windows.push(screenWindows);
 
       screenWindows.loadURL(url);
-
-      //screenWindows.webContents.openDevTools();
     }
   }
 
@@ -125,5 +123,6 @@ export class BBBMeeting {
   public async leave() {
     this.closeScreens();
     await this.bbbGraphQl.leaveMeeting();
+    await this.apolloClient.stop();
   }
 }

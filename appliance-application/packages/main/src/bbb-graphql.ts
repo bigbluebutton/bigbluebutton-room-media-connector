@@ -208,7 +208,7 @@ export class BBBGraphql {
         },
         on: {
           error: error => {
-            console.error(`GraphQL-Client: Error: on subscription to server: ${error}`);
+            console.error('GraphQL-Client: Error: on subscription to server:', error);
           },
           closed: () => {
             console.info('GraphQL-Client: Connection closed');
@@ -250,10 +250,6 @@ export class BBBGraphql {
 
   public getApolloClient() {
     return this.apolloClient;
-  }
-
-  public getUserId() {
-    return this.userId;
   }
 
   public async leaveMeeting() {

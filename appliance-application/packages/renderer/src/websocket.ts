@@ -2,85 +2,129 @@ export default class BBBWebSocket {
   public url: string;
   public reconnect_interval_time: number;
   public ping_interval_time: number;
+  public roomConfig;
 
-  private connection: WebSocket;
+  private connection: WebSocket | null;
 
   private ping_interval: number;
-  private new_pin_callback;
-  private offer_callback;
+  private pairing_pin_callback;
+  private verification_callback;
   private connection_status_callback;
+  private plugin_disconnected_callback;
+  private join_urls_callback;
 
-  constructor(url, reconnect_interval_time = 1000, ping_interval_time = 1000) {
+  constructor(roomConfig, url, reconnect_interval_time = 1000, ping_interval_time = 1000) {
+    this.roomConfig = roomConfig;
     this.url = url;
     this.reconnect_interval_time = reconnect_interval_time;
     this.ping_interval_time = ping_interval_time;
+
+    window.addEventListener('unload', () => {
+      if (this.connection.readyState == WebSocket.OPEN) {
+        console.log('closing connection');
+        this.disconnect();
+      }
+    });
   }
 
-  connect(roomConfig) {
+  connect() {
     try {
       this.connection = new WebSocket(this.url);
     } catch (error) {
       this.connection_status_callback(false);
-      this.reconnect(roomConfig);
+      this.reconnect();
       return;
     }
 
-    this.connection.addEventListener('open', () => {
+    this.connection.onopen = () => {
       this.connection_status_callback(true);
 
-      this.connection.send(JSON.stringify({config: roomConfig}));
+      this.connection.send(
+        JSON.stringify({
+          type: 'RegisterRoom',
+          roomConfig: this.roomConfig,
+        }),
+      );
 
       this.ping_interval = setInterval(() => {
         this.ping();
       }, this.ping_interval_time);
-    });
+    };
 
-    this.connection.addEventListener('close', () => {
-      this.connection_status_callback(false);
-      this.reconnect(roomConfig);
-    });
+    this.connection.onclose = () => {
+      clearInterval(this.ping_interval);
+      this.reconnect(0);
+    };
 
-    this.connection.addEventListener('message', event => {
+    this.connection.onmessage = event => {
       const data = JSON.parse(event.data);
 
-      if (data.action == 'new_pin') {
-        this.new_pin_callback(data.pin.toString());
+      if (data.type == 'PairingPIN') {
+        this.pairing_pin_callback(data.PIN);
       }
 
-      if (data.action == 'start') {
-        this.offer_callback(data.urls, data.pairing_pin.toString());
+      if (data.type == 'VerificationCode') {
+        this.verification_callback(data.verification_code);
       }
-    });
+
+      if (data.type == 'JoinURLs') {
+        this.join_urls_callback(data.urls);
+      }
+
+      if (data.type == 'PluginDisconnected') {
+        this.plugin_disconnected_callback();
+      }
+    };
   }
 
-  reconnect(roomConfig, timeout: number | null = null) {
-    const reconnect_timeout = timeout || this.reconnect_interval_time;
+  disconnect() {
+    clearInterval(this.ping_interval);
+    this.connection.close();
+    this.connection = null;
+  }
+
+  reconnect(timeout: number | null = null) {
+    if (timeout == null) {
+      timeout = this.reconnect_interval_time;
+    }
     setTimeout(() => {
-      this.connect(roomConfig);
-    }, reconnect_timeout);
+      this.connect();
+    }, timeout);
   }
 
   ping() {
-    this.connection.send(JSON.stringify({type: 'ping'}));
+    this.connection.send(JSON.stringify({type: 'Ping'}));
   }
 
-  acceptOffer() {
-    this.connection.send(JSON.stringify({type: 'offer_response', response: 'accept'}));
+  disconnectFromPlugin() {
+    this.connection.send(JSON.stringify({type: 'Disconnect'}));
   }
 
-  rejectOffer() {
-    this.connection.send(JSON.stringify({type: 'offer_response', response: 'reject'}));
+  acceptVerification() {
+    this.connection.send(JSON.stringify({type: 'VerificationCodeResponse', status: true}));
+  }
+
+  rejectVerification() {
+    this.connection.send(JSON.stringify({type: 'VerificationCodeResponse', status: false}));
   }
 
   setConnectionStatusCallback(callback) {
     this.connection_status_callback = callback;
   }
 
-  setNewPinCallback(callback) {
-    this.new_pin_callback = callback;
+  setPairingPinCallback(callback) {
+    this.pairing_pin_callback = callback;
   }
 
-  setOfferCallback(callback) {
-    this.offer_callback = callback;
+  setVerificationCallback(callback) {
+    this.verification_callback = callback;
+  }
+
+  setJoinUrlCallback(callback) {
+    this.join_urls_callback = callback;
+  }
+
+  setPluginDisconnectedCallback(callback) {
+    this.plugin_disconnected_callback = callback;
   }
 }

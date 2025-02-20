@@ -22,7 +22,7 @@ export class StreamDeckHID implements HID {
   private REJECT_IMG;
   private LEAVE_IMG;
 
-  private hasOffer = false;
+  private hasVerificationPending = false;
 
   private acceptCallback: () => void;
   private rejectCallback: () => void;
@@ -44,15 +44,15 @@ export class StreamDeckHID implements HID {
     this.streamDeck.on('up', button => {
       console.log('key %d up', button.index);
 
-      if (button.index === StreamDeckHID.ACCEPT_BUTTON.index && this.hasOffer) {
-        this.hasOffer = false;
-        this.hideOfferButtons();
+      if (button.index === StreamDeckHID.ACCEPT_BUTTON.index && this.hasVerificationPending) {
+        this.hasVerificationPending = false;
+        this.hideVerificationButtons();
         this.acceptCallback();
       }
 
-      if (button.index === StreamDeckHID.REJECT_BUTTON.index && this.hasOffer) {
-        this.hasOffer = false;
-        this.hideOfferButtons();
+      if (button.index === StreamDeckHID.REJECT_BUTTON.index && this.hasVerificationPending) {
+        this.hasVerificationPending = false;
+        this.hideVerificationButtons();
         this.rejectCallback();
       }
 
@@ -143,26 +143,26 @@ export class StreamDeckHID implements HID {
       .toBuffer();
   }
 
-  newOffer(accept: () => void, reject: () => void): void {
-    this.hasOffer = true;
+  requireVerification(accept: () => void, reject: () => void): void {
+    this.hasVerificationPending = true;
 
     this.acceptCallback = accept;
     this.rejectCallback = reject;
 
-    this.showOfferButtons();
+    this.showVerificationButtons();
   }
 
-  acceptedOffer(): void {
-    this.hasOffer = false;
-    this.hideOfferButtons();
+  verificationAccepted(): void {
+    this.hasVerificationPending = false;
+    this.hideVerificationButtons();
   }
 
-  rejectedOffer(): void {
-    this.hasOffer = false;
-    this.hideOfferButtons();
+  verificationRejected(): void {
+    this.hasVerificationPending = false;
+    this.hideVerificationButtons();
   }
 
-  showOfferButtons(): void {
+  showVerificationButtons(): void {
     this.streamDeck.clearPanel();
 
     this.streamDeck.fillKeyBuffer(StreamDeckHID.BBB_BUTTON.index, this.BBB_IMG);
@@ -175,7 +175,7 @@ export class StreamDeckHID implements HID {
     this.streamDeck.fillPanelBuffer(this.BBB_IMG_LG);
   }
 
-  hideOfferButtons(): void {
+  hideVerificationButtons(): void {
     this.streamDeck.clearKey(StreamDeckHID.ACCEPT_BUTTON.index);
     this.streamDeck.clearKey(StreamDeckHID.REJECT_BUTTON.index);
   }

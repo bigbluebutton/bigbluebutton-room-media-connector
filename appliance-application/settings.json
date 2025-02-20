@@ -4,6 +4,7 @@
     "reconnect_interval": 5000,
     "ping_interval": 10000
   },
+  "auto_reject_time": 10,
   "preferred_pin_screen": "Screen left",
   "hide_close_button": false,
   "room": {

@@ -33,7 +33,7 @@ module.exports = async function () {
       target: ['portable'],
     },
     mac: {
-      target: "dmg",
+      target: 'dmg',
     },
     deb: {
       afterInstall: 'installer/linux/after-install.tpl',
@@ -41,7 +41,6 @@ module.exports = async function () {
     rpm: {
       afterInstall: 'installer/linux/after-install.tpl',
     },
-
 
     publish: [
       {
