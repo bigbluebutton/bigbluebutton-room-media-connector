@@ -327,7 +327,7 @@ func main() {
 	port := flag.Int("port", getEnvAsInt("ROOM_HUB_PORT", 8080), "websocket server port")
 	timeout := flag.Int("ws_timeout", getEnvAsInt("ROOM_HUB_WS_TIMEOUT", 60), "websocket read timeout in seconds")
 	jsonLog := flag.Bool("json_log", getEnvAsBool("ROOM_HUB_JSON_LOG", true), "log in json format")
-	pinRotationInterval = flag.Int("pin_rotation", getEnvAsInt("ROOM_HUB_PIN_INTERVAL", 60), "time interval to generate a new pin in seconds")
+	pinRotationInterval = flag.Int("pin_rotation", getEnvAsInt("ROOM_HUB_PIN_ROTATION", 60), "time interval to generate a new pin in seconds")
 	flag.Parse()
 
 	validate = validator.New()
