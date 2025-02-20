@@ -3,16 +3,19 @@ package main
 import (
 	"crypto/rand"
 	"flag"
-	"github.com/go-playground/validator/v10"
-	"github.com/gorilla/websocket"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"math/big"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/go-playground/validator/v10"
+	"github.com/gorilla/websocket"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
+
+var pinRotationInterval *int
 
 var validate *validator.Validate
 
@@ -287,17 +290,44 @@ func pluginHandler(w http.ResponseWriter, r *http.Request, timeout int) {
 	}
 }
 
+// Helper functions to read environment variables
+func getEnv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return fallback
+}
+
+func getEnvAsInt(name string, defaultVal int) int {
+	if value, exists := os.LookupEnv(name); exists {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultVal
+}
+
+func getEnvAsBool(name string, defaultVal bool) bool {
+	if value, exists := os.LookupEnv(name); exists {
+		if boolVal, err := strconv.ParseBool(value); err == nil {
+			return boolVal
+		}
+	}
+	return defaultVal
+}
+
 // main is the entry point of the application.
 // It starts the WebSocket server and listens for incoming connections on the specified host and port.
 func main() {
 	// UNIX Time is faster and smaller than most timestamps
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
-	// Parse command line arguments for host and port
-	host := flag.String("host", "127.0.0.1", "websocket server host")
-	port := flag.Int("port", 8080, "websocket server port")
-	timeout := flag.Int("timeout", 60, "read timeout in seconds")
-	jsonLog := flag.Bool("json_log", true, "log in json format")
+	// Parse command-line arguments for host, port, and other options
+	host := flag.String("host", getEnv("ROOM_HUB_HOST", "127.0.0.1"), "websocket server host")
+	port := flag.Int("port", getEnvAsInt("ROOM_HUB_PORT", 8080), "websocket server port")
+	timeout := flag.Int("ws_timeout", getEnvAsInt("ROOM_HUB_WS_TIMEOUT", 60), "websocket read timeout in seconds")
+	jsonLog := flag.Bool("json_log", getEnvAsBool("ROOM_HUB_JSON_LOG", true), "log in json format")
+	pinRotationInterval = flag.Int("pin_rotation", getEnvAsInt("ROOM_HUB_PIN_INTERVAL", 60), "time interval to generate a new pin in seconds")
 	flag.Parse()
 
 	validate = validator.New()

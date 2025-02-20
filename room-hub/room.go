@@ -3,15 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"github.com/google/uuid"
-	"github.com/gorilla/websocket"
-	"github.com/rs/zerolog/log"
 	"net"
 	"sync"
 	"time"
-)
 
-const pinRotationInterval = 10 // Interval in seconds
+	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
+	"github.com/rs/zerolog/log"
+)
 
 func generateVerificationCode() (string, error) {
 	const length int = 4
@@ -122,7 +121,7 @@ func (room *Room) startPinGen() bool {
 
 	go func() {
 		defer cancel()
-		ticker := time.NewTicker(pinRotationInterval * time.Second)
+		ticker := time.NewTicker(time.Duration(*pinRotationInterval) * time.Second)
 		defer ticker.Stop()
 
 		for {
