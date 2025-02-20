@@ -6,12 +6,14 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 	"net"
+	"sync"
 )
 
 type Plugin struct {
 	Id     string
 	RoomID string
 	Conn   *websocket.Conn
+	mu     sync.Mutex
 }
 
 func newPlugin(conn *websocket.Conn) *Plugin {
@@ -96,6 +98,8 @@ func (plugin *Plugin) disconnect(propagateToOpposite bool) {
 }
 
 func (plugin *Plugin) sendMessage(message any) bool {
+	plugin.mu.Lock()
+	defer plugin.mu.Unlock()
 
 	messageJSON, err := json.Marshal(message)
 	if err != nil {

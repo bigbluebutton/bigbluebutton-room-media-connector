@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -25,6 +26,7 @@ type Room struct {
 	State      string
 	PairingPIN string
 	StopPinGen context.CancelFunc
+	mu         sync.Mutex
 }
 
 func newRoom(conn *websocket.Conn) *Room {
@@ -248,6 +250,8 @@ func (room *Room) register(config RoomConfig) {
 }
 
 func (room *Room) sendMessage(message any) bool {
+	room.mu.Lock()
+	defer room.mu.Unlock()
 
 	messageJSON, err := json.Marshal(message)
 	if err != nil {
