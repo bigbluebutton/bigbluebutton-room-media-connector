@@ -10,7 +10,7 @@ import {
     ActionButtonDropdownSeparator,
     ActionButtonDropdownOption
 } from 'bigbluebutton-html-plugin-sdk';
-import {Config, Layout, ResponseData, RoomMediaPluginProps} from './types';
+import {RoomConfig, Layout, ResponseData, RoomMediaPluginProps} from './types';
 
 import PinComponent from './Shared/PinComponent';
 import LoaderComponent from './Shared/LoaderComponent';
@@ -28,18 +28,19 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
     //const {data: pluginSettings} = pluginApi.usePluginSettings();
 
     const pluginSettings = {
-        pairingWebsocketUrl: "wss://bbb-dev-bigbluebutton-openstack.uni-osnabrueck.de/hybrid/ws",
+        //pairingWebsocketUrl: "wss://bbb-dev-bigbluebutton-openstack.uni-osnabrueck.de/hybrid/ws",
+        pairingWebsocketUrl: "wss://plugins-bigbluebutton-openstack.uni-osnabrueck.de/room-hub/ws_plugin",
     };
 
     const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
     const [filteredLayout, setFilteredLayout] = useState<Layout | null>(null);
     const [tempFilteredLayout, setTempFilteredLayout] = useState<Layout | null>(null);
     const [filteredLayouts, setFilteredLayouts] = useState<Layout[] | null>(null);
-    const [roomConfig, setRoomConfig] = useState<Config | null>(null);
-    const [offerResponse, setOfferResponse] = useState<string | null>(null);
-    const [pairingPin, setPairingPin] = useState<string | null>(null);
+    const [roomConfig, setRoomConfig] = useState<RoomConfig | null>(null);
+    const [isCodeVerified, setIsCodeVerified] = useState<boolean | null>(false);
+    const [verificationCode, setVerificationCode] = useState<string | null>(null);
+    
     const [roomJoinUrls, setRoomJoinUrls] = useState(null);
-
     const [pinValue, setPinValue] = useState<string | null>(null);
     const [pinError, setPinError] = useState<boolean>(false);
     const [isPairing, setIsPairing] = useState<boolean>(false);
@@ -50,7 +51,7 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
     const [isUserMuted, setIsUserMuted] = useState<boolean>(true);
 
     const extractFilterLayouts = (jsonData: ResponseData, index: number) => {
-        const layoutsArray = Object.values(jsonData.config.layouts);
+        const layoutsArray = Object.values(jsonData.roomConfig.layouts);
         setFilteredLayouts(layoutsArray);
         const filteredLayout = layoutsArray.find((layout) => layout.index === index);
         setFilteredLayout(filteredLayout);
@@ -70,9 +71,12 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
             if (ws.readyState === WebSocket.OPEN) {
                 try {
                     const data = {
-                        pin: Number(pinValue),
+                        type: 'PairingPINUserInput',                        
+                        PIN: pinValue,
                     };
+                    console.debug('Hybrid-Plugin --- Sending data via WebSocket:', JSON.stringify(data));
                     ws.send(JSON.stringify(data));
+                    console.debug('Hybrid-Plugin --- Data was sent via WebSocket:', JSON.stringify(data));
                 } catch (error) {
                     console.error('Hybrid-Plugin --- Error sending data via WebSocket:', error);
                 }
@@ -82,26 +86,28 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             console.debug('Hybrid-Plugin --- websocket onmessage: ', data);
-            if (data.status === 200 && data.msg === 'ok') {
-                setRoomConfig(data.config);
+
+            if (data.type === 'PairingPINFound') {
+                console.debug('Hybrid-Plugin --- Setting verficitation code:', data.verification_code);
+                setIsCodeVerified(false);
+                setVerificationCode(data.verification_code);
+            }
+
+            if (data.type === 'VerificationCodeAccepted') {
+                setIsPairing(false);
+                setIsCodeVerified(true);
+                setStatus('layoutSelection');
+                setRoomConfig(data.roomConfig);
                 extractFilterLayouts(data, 0);
                 resetPinValues();
             }
 
-            if (data.status === 200 && data.msg === 'pairing') {
-                setIsPairing(false);
-                setPairingPin(data.pairing_pin);
-            }
-
-            if (data.type == 'offer_response') {
-                setOfferResponse(data.response);
-            }
         };
 
         ws.onclose = (e) => {
             console.info('Hybrid-Plugin --- Room Integration Plugin: WebSocket connection closed', e);
             setPinError(true);
-            setIsPairing(false);
+            setIsPairing(false);            
         };
 
         setWebSocket(ws);
@@ -129,15 +135,6 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
     }, [pinValue]);
 
     useEffect(() => {
-        if (offerResponse === 'accept') {
-            setStatus('accepted');
-            setTimeout(() => {
-                setStatus('layoutSelection');
-                }, 500);
-        }
-    }, [offerResponse]);
-
-    useEffect(() => {
         // Since it is a real time value, we set it once!
         if (talkingIndicator && talkingIndicator.length > 0) {
             const userTalkingIndicator = talkingIndicator.find((ti) => ti.userId === currentUser?.userId);
@@ -159,26 +156,16 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
         }
     }
 
-    const performLayoutSelection = async () => {
-        setStatus('selectingLayout');
+    const prepareLayoutSelection = async (index: number): Promise<void>  => {
+        const filteredLayout = filteredLayouts.find((layout) => layout.index === index);
+        setTempFilteredLayout(filteredLayout);
+        setConfirmationTitle(filteredLayout.label);
+        setStatus('applyingLayout');
         await muteCurrentUser();
         setFilteredLayout(tempFilteredLayout);
         setStatus('layoutSelected');
         resetPinValues();
         setShowModal(false);
-    }
-
-    const cancelLayoutSelection = (): void => {
-        setTempFilteredLayout(null);
-        setConfirmationTitle(null);
-        setStatus('layoutSelection');
-    }
-
-    const prepareLayoutSelection = (index: number): void  => {
-        const filteredLayout = filteredLayouts.find((layout) => layout.index === index);
-        setTempFilteredLayout(filteredLayout);
-        setConfirmationTitle(filteredLayout.label);
-        setStatus('confirmLayoutSelection');
     }
 
     useEffect(() => {
@@ -242,7 +229,7 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
                     })
                 );
                 const roomJoinUrls = {
-                    "urls": {"control": controlJoinUrl, "screens": screenJoinUrls}
+                    "type": "JoinURLs", "urls": {"control": controlJoinUrl, "screens": screenJoinUrls}
                 };
                 setRoomJoinUrls(roomJoinUrls);
                 console.info("Hybrid-Plugin --- Room Join URLs: ", roomJoinUrls)
@@ -277,31 +264,31 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
                     width: '100%', height: '100%', alignItems: 'center', display: 'flex', flexDirection: 'column',
                 }}
             >
-                {!pairingPin ?
+
+                {!verificationCode ?
                     <>
-                    {!isPairing ?
+                    {isPairing ?
+                        <>
+                            <LoaderComponent title="Pairing..." />
+                        </>
+                        :
                         <>
                             <PinComponent
                                 performCompletion={handlePinCompletion}
                                 hasError={pinError}
                             />
                         </>
-                        :
-                        <>
-                            <LoaderComponent title="Pairing..." />
-                        </>
                     }
                     </>
-                    :
-                    !offerResponse ?
-                        <>
-                            <h3>Pairing with '{roomConfig.name}'</h3>
-                            <h4>Please verify the pairing PIN and confirm on the appliance</h4>
-                            <h2>{pairingPin}</h2>
-                        </>
+                :
+                !isCodeVerified ?
+                    <>                        
+                        <h4>Please verify the pairing code and confirm on the appliance</h4>
+                        <h2>{verificationCode}</h2>
+                    </>
                         :
                         <>
-                            {offerResponse == "accept" ?
+                            {status ?
                                 <>
                                     {status == "accepted" &&
                                         <>
@@ -318,18 +305,7 @@ export function RoomMediaPlugin({pluginUuid: uuid}: RoomMediaPluginProps) {
                                         </>
                                     }
 
-                                    {status == "confirmLayoutSelection" &&
-                                        <>
-                                            <ConfirmationComponent
-                                                title={confirmationTitle}
-                                                text="Are you sure to select this layout?"
-                                                confirm={performLayoutSelection}
-                                                cancel={cancelLayoutSelection}
-                                            />
-                                        </>
-                                    }
-
-                                    {status == "selectingLayout" &&
+                                    {status == "applyingLayout" &&
                                         <>
                                             <LoaderComponent title="Applying layout..." />
                                         </>
