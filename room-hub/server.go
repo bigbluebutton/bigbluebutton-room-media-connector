@@ -32,7 +32,7 @@ var connManager = &ConnectionManager{
 
 type Client interface {
 	sendMessage(message any) bool
-	disconnect()
+	disconnect(propagateToOpposite bool)
 	close()
 }
 
@@ -72,7 +72,7 @@ func sendPongMessage(client Client) {
 	}
 
 	if !client.sendMessage(pongMessage) {
-		client.disconnect()
+		client.disconnect(true)
 	}
 	return
 }
@@ -164,7 +164,7 @@ func roomHandler(w http.ResponseWriter, r *http.Request, timeout int) {
 			// Room is connected to a plugin
 
 			if message.Type == MessageTypeDisconnect {
-				room.disconnect()
+				room.disconnect(true)
 				continue
 			}
 
@@ -267,7 +267,7 @@ func pluginHandler(w http.ResponseWriter, r *http.Request, timeout int) {
 				// Room is connected to a plugin
 
 				if message.Type == MessageTypeDisconnect {
-					plugin.disconnect()
+					plugin.disconnect(true)
 					continue
 				}
 

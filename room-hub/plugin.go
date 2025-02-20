@@ -65,13 +65,13 @@ func (plugin *Plugin) close() {
 	// Plugin disconnected, close the connection
 	plugin.Conn.Close()
 
-	plugin.disconnect()
+	plugin.disconnect(true)
 
 	// Remove plugin from connection manager
 	connManager.removePlugin(plugin)
 }
 
-func (plugin *Plugin) disconnect() {
+func (plugin *Plugin) disconnect(propagateToOpposite bool) {
 	// Get room
 	room := plugin.getRoom()
 
@@ -89,7 +89,9 @@ func (plugin *Plugin) disconnect() {
 
 		room.sendMessage(pluginDisconnectedMessage)
 
-		room.disconnect()
+		if propagateToOpposite {
+			room.disconnect(true)
+		}
 	}
 }
 

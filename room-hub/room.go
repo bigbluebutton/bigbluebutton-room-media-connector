@@ -105,7 +105,7 @@ func (room *Room) rejectConnection() {
 	}
 
 	// Disconnect from plugin
-	room.disconnect()
+	room.disconnect(true)
 }
 
 func (room *Room) startPinGen() bool {
@@ -157,13 +157,13 @@ func (room *Room) close() {
 
 	room.State = "closing"
 
-	room.disconnect()
+	room.disconnect(true)
 
 	// Remove room from connection manager
 	connManager.removeRoom(room)
 }
 
-func (room *Room) disconnect() {
+func (room *Room) disconnect(propagateToOpposite bool) {
 	// Get plugin
 	plugin := room.getPlugin()
 
@@ -182,7 +182,7 @@ func (room *Room) disconnect() {
 		plugin.sendMessage(roomDisconnectedMessage)
 
 		// Reset plugin
-		plugin.disconnect()
+		plugin.disconnect(false)
 	}
 
 	// Reset room state to ready
