@@ -24,20 +24,13 @@ type Layouts = {
     [key: string]: Layout;
 };
 
-type Config = {
-    name: string;
-    bbb_user_id: string;
+type RoomConfig = {
     bbb_user_name: string;
+    bbb_user_id: string;
     layouts: Layouts;
 };
 
-type ResponseData = {
-    status: number;
-    msg: string;
-    config: Config;
-};
-
-export { LayoutScreen, Layout, Config, ResponseData };
+export { LayoutScreen, Layout, RoomConfig };
 
 interface PinComponentProps {
     performCompletion(value: string, index: number): void,
