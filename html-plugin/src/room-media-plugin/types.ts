@@ -6,7 +6,7 @@ interface RoomMediaPluginProps {
 export { RoomMediaPluginProps };
 
 type LayoutScreen = {
-    "bbb-join-parameters": {
+    "bbb_join_parameters": {
         [key: string]: string;
     };
 };
