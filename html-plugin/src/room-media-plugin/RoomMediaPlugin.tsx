@@ -223,7 +223,7 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
                     Object.entries(filteredLayout.screens).map(async ([key, value]) => {
                         const joinParametersMap = {
                             ...baseJoinParameters,
-                            ...value['bbb-join-parameters']
+                            ...value['bbb_join_parameters']
                         };
                         screenJoinUrls[key] = await pluginApi.getJoinUrl(joinParametersMap);
                     })
