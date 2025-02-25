@@ -1,14 +1,19 @@
 <script lang="ts" setup>
-import PairingCode from '/@/components/PairingCode.vue';
+import PairingCode from './components/PairingCode.vue';
 import {inject, onMounted, ref} from 'vue';
-import BBBWebSocket from '/@/websocket';
-import LoadingSpinner from '/@/components/LoadingSpinner.vue';
-import ConnectionError from '/@/components/ConnectionError.vue';
-import VerifyConnection from '/@/components/VerifyConnection.vue';
-import ConfigMissing from '/@/components/ConfigMissing.vue';
+import BBBWebSocket from './websocket';
+import LoadingSpinner from './components/LoadingSpinner.vue';
+import ConnectionError from './components/ConnectionError.vue';
+import VerifyConnection from './components/VerifyConnection.vue';
+import ConfigMissing from './components/ConfigMissing.vue';
 import {XMarkIcon} from '@heroicons/vue/24/solid';
+import type {Config} from '../../common/config.ts';
 
-const config = inject('config');
+// @ts-expect-error
+const config: Config = inject('config');
+
+// @ts-expect-error
+const configPath: string = inject('configPath');
 
 const pin = ref<string | null>(null);
 const verificationCode = ref<string | null>(null);
@@ -28,9 +33,16 @@ const onVerification = (newVerificationCode: string) => {
   window.electronAPI.requireVerification();
 };
 
-const onJoinUrls = urls => {
-  window.electronAPI.joinURLs(urls);
+const onJoinUrl = (url: string, layoutIndex: number) => {
+  window.electronAPI.joinMeeting(url, layoutIndex);
 };
+
+/*
+@TODO: Remove, old implementation where plugin created multiple urls
+const onJoinUrls = urls => {
+  window.electronAPI.joinMeeting(urls);
+};
+*/
 
 window.electronAPI.handleLeftMeeting(() => {
   ws.disconnectFromPlugin();
@@ -46,25 +58,28 @@ window.electronAPI.handleVerificationRejected(() => {
   verificationCode.value = null;
 });
 
-let ws = null;
+let ws: BBBWebSocket;
 
 function connect() {
   ws = new BBBWebSocket(
-    config.config.room,
-    config.config.control_server.ws,
-    config.config.control_server.reconnect_interval,
-    config.config.control_server.ping_interval,
+    config.room,
+    config.control_server.ws,
+    config.control_server.reconnect_interval,
+    config.control_server.ping_interval,
   );
   ws.setConnectionStatusCallback(onConnectionChanged);
   ws.setPairingPinCallback(onPairingPin);
   ws.setVerificationCallback(onVerification);
-  ws.setJoinUrlCallback(onJoinUrls);
+  ws.setJoinUrlCallback(onJoinUrl);
+  // @TODO: Remove, old implementation where plugin created multiple urls
+  // ws.setJoinUrlsCallback(onJoinUrls);
   ws.setPluginDisconnectedCallback(onPluginDisconnected);
+
   ws.connect();
 }
 
 onMounted(() => {
-  if (config.config) {
+  if (config) {
     connect();
   }
 });
@@ -77,6 +92,10 @@ function onVerificationAccepted() {
 
 function onPluginDisconnected() {
   window.electronAPI.pluginDisconnected();
+  if(verificationCode.value) {
+    window.electronAPI.verificationRejected();
+    verificationCode.value = null;
+  }
 }
 
 function onVerificationRejected() {
@@ -93,7 +112,7 @@ const closeApp = () => {
 <template>
   <main class="flex h-screen place-items-center justify-center px-6 py-24 sm:py-32 lg:px-8">
     <button
-      v-if="config.config.hide_close_button !== true"
+      v-if="!config.hide_close_button"
       class="absolute top-5 right-5 rounded-full bg-red-500 p-2 hover:bg-red-600"
       @click="closeApp"
     >
@@ -113,7 +132,7 @@ const closeApp = () => {
 
       <div class="block mt-4 w-full">
         <div
-          v-if="config.config"
+          v-if="config"
           class="flex items-center flex-col justify-center px-10"
         >
           <loading-spinner
@@ -130,7 +149,7 @@ const closeApp = () => {
 
           <verify-connection
             v-if="verificationCode"
-            :auto-reject-time="config.config.auto_reject_time"
+            :auto-reject-time="config.auto_reject_time"
             :verification-code="verificationCode"
             @accept="onVerificationAccepted"
             @reject="onVerificationRejected"
@@ -138,7 +157,7 @@ const closeApp = () => {
         </div>
         <config-missing
           v-else
-          :config-path="config.path"
+          :config-path="configPath"
         />
       </div>
     </div>

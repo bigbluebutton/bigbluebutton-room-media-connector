@@ -18,7 +18,7 @@
         "label": "Chat left, video right",
         "screens": {
           "Screen left": {
-            "bbb-join-parameters": {
+            "bbb_join_parameters": {
               "enforceLayout": "participantsAndChatOnly",
               "userdata-bbb_display_notifications": false,
               "userdata-bbb_hide_nav_bar": true,
@@ -27,7 +27,7 @@
             }
           },
           "Screen right": {
-            "bbb-join-parameters": {
+            "bbb_join_parameters": {
               "userdata-bbb_hide_actions_bar": true,
               "enforceLayout": "camerasOnly",
               "userdata-bbb_display_notifications": false,
@@ -46,7 +46,7 @@
         "label": "Video left, presentation right",
         "screens": {
           "Screen left": {
-            "bbb-join-parameters": {
+            "bbb_join_parameters": {
               "userdata-bbb_hide_actions_bar": true,
               "enforceLayout": "camerasOnly",
               "userdata-bbb_display_notifications": false,
@@ -59,7 +59,7 @@
             }
           },
           "Screen right": {
-            "bbb-join-parameters": {
+            "bbb_join_parameters": {
               "userdata-bbb_self_view_disable": true,
               "enforceLayout": "presentationOnly",
               "userdata-bbb_display_notifications": false,

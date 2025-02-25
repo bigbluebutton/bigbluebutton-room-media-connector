@@ -1,9 +1,18 @@
 import {app} from 'electron';
 import './security-restrictions';
-import {restoreOrCreateWindow, hdiDevices} from '/@/mainWindow';
+import {restoreOrCreateWindow} from './mainWindow';
 import {listStreamDecks, openStreamDeck} from '@elgato-stream-deck/node';
-import {StreamDeckHID} from '/@/streamdeck';
+import {StreamDeckHID} from './streamdeck';
 import {autoUpdater} from 'electron-updater';
+import fs from 'fs';
+import {DisplayManager} from './displayManager';
+import type {HID} from './HID';
+import type {Config} from '../../common/config.ts';
+
+export let displayManager: DisplayManager;
+export const hdiDevices: HID[] = [];
+export let config: Config;
+export let configPath: string;
 
 /**
  * Prevent electron from running multiple instances.
@@ -15,18 +24,14 @@ if (!isSingleInstance) {
 }
 app.on('second-instance', restoreOrCreateWindow);
 
-/**
- * Disable Hardware Acceleration to save more system resources.
- */
-app.disableHardwareAcceleration();
-
 app.on('window-all-closed', () => {
   app.quit();
 });
 
 let isQuitting = false;
 
-app.on('before-quit', async (event: Event): Promise<void> => {
+
+app.on('before-quit', (event: Electron.Event): void => {
   if (!isQuitting) {
     event.preventDefault();
     isQuitting = true;
@@ -35,9 +40,9 @@ app.on('before-quit', async (event: Event): Promise<void> => {
       return device.close();
     });
 
-    await Promise.all(promises);
-
-    app.quit();
+    Promise.all(promises).then(() => {
+      app.quit();
+    });
   }
 });
 
@@ -51,25 +56,10 @@ app.on('before-quit', async (event: Event): Promise<void> => {
  */
 app
   .whenReady()
+  .then(loadConfig)
+  .then(loadDisplays)
+  .then(loadHDIDevices)
   .then(restoreOrCreateWindow)
-  .then(async () => {
-    console.log('App is ready');
-
-    try {
-      const allStreamDeckDevices = await listStreamDecks();
-
-      const streamDecks = allStreamDeckDevices.map(device => {
-        return openStreamDeck(device.path, {resetToLogoOnClose: true});
-      });
-
-      (await Promise.all(streamDecks)).forEach(streamDeck => {
-        console.debug('Stream Deck found: ' + streamDeck.PRODUCT_NAME);
-        hdiDevices.push(new StreamDeckHID(streamDeck));
-      });
-    } catch (e) {
-      console.error(e);
-    }
-  })
   .catch(e => console.error('Failed create window:', e));
 
 /**
@@ -90,3 +80,41 @@ if (import.meta.env.PROD) {
     .catch((e) => console.error('Failed check updates:', e));
 }
 */
+
+function loadConfig() {
+  // Loading config file
+  const appUserDataPath = app.getPath('userData');
+  configPath = appUserDataPath + '/settings.json';
+  try {
+    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    console.log('Config loaded from ' + configPath);
+  } catch (error) {
+    console.log('Error reading config from ' + configPath, error);
+  }
+}
+
+function loadDisplays() {
+  displayManager = new DisplayManager();
+
+  const allDisplays = displayManager.getDisplays();
+  allDisplays.forEach(display => {
+    console.log(`Found display '${display.label}'`);
+  });
+}
+
+async function loadHDIDevices() {
+  try {
+    const allStreamDeckDevices = await listStreamDecks();
+
+    const streamDecks = allStreamDeckDevices.map(device => {
+      return openStreamDeck(device.path, {resetToLogoOnClose: true});
+    });
+
+    (await Promise.all(streamDecks)).forEach(streamDeck => {
+      console.log('Stream Deck found: ' + streamDeck.PRODUCT_NAME);
+      hdiDevices.push(new StreamDeckHID(streamDeck));
+    });
+  } catch (e) {
+    console.error(e);
+  }
+}

@@ -1,51 +1,21 @@
-import {app, BrowserWindow, ipcMain, screen, session} from 'electron';
+import {app, BrowserWindow, ipcMain } from 'electron';
 import {join, resolve} from 'node:path';
-import fs from 'fs';
-import type {HID} from '/@/HID';
-import {BBBMeeting} from '/@/bbb-meeting';
+import { createBBBMeeting } from './BBBMeeting';
 import {fileURLToPath} from 'url';
 import path from 'path';
-import {DisplayManager} from '/@/displayManager';
+import {config, configPath, displayManager, hdiDevices} from './index';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export const hdiDevices: HID[] = [];
-
+/**
+ * Create the main window of the application, the PIN screen.
+ */
 async function createWindow() {
-  // Loading config file
-  const appUserDataPath = app.getPath('userData');
-  const path = appUserDataPath + '/settings.json';
-  let config = null;
-  try {
-    config = JSON.parse(fs.readFileSync(path, 'utf8'));
-    console.log('Config loaded from ' + path);
-  } catch (e) {
-    console.log('No config found in ' + path);
-  }
+  // Get the display for the pin screen
+  const pinDisplay = getPINScreen();
 
-  // Get all connected screens
-  const displayManager = new DisplayManager();
-
-  // Get display for the pin screen
-  const pinDisplayLabel = config ? config['preferred_pin_screen'] : '';
-
-  const allDisplays = displayManager.getDisplays();
-  allDisplays.forEach(display => {
-    console.log(
-      'Found display ' +
-        display.label +
-        ' with size ' +
-        display.size.width +
-        'x' +
-        display.size.height,
-    );
-  });
-
-  console.log('Preferred pin screen: ' + pinDisplayLabel);
-
-  const pinDisplay = displayManager.getDisplay(pinDisplayLabel) || displayManager.getDisplays()[0];
-
+  // Create the BrowserWindow
   const browserWindow = new BrowserWindow({
     show: false, // Use the 'ready-to-show' event to show the instantiated BrowserWindow.
     width: pinDisplay.size.width,
@@ -62,81 +32,115 @@ async function createWindow() {
     },
   });
 
+  // RPC from the UI to get the settings
   ipcMain.handle('getConfig', () => {
-    return {path, config};
+    return {path: configPath, config};
   });
 
+  // Message from the UI that a verification is required
+  // User can accept/decline the verification in the UI or by using HDI devices
   ipcMain.on('requireVerification', () => {
+    // Notify all connected HDI devices that a verification is required
     hdiDevices.forEach(device => {
       device.requireVerification(
         () => {
+          // Send the acceptVerification message to the UI
           browserWindow.webContents.send('acceptVerification');
         },
         () => {
+          // Send the rejectVerification message to the UI
           browserWindow.webContents.send('rejectVerification');
         },
       );
     });
   });
 
-  ipcMain.on('joinURLs', async (event, joinURLs) => {
-    console.log('joinUrls', joinURLs);
+  // Message from the UI to join the meeting
+  ipcMain.on('joinMeeting', async (event, joinUrl: string, layoutIndex: number) => {
+    console.log('joinMeeting', joinUrl);
 
-    const bbbMeeting = new BBBMeeting(joinURLs.control, joinURLs.screens, displayManager);
+    // Callback: Appliance has left the meeting or the meeting has ended
+    const leftCallback = () => {
+      console.log('Appliance has left the meeting');
 
+      // Notify all connected HDI devices that the user has left the meeting
+      hdiDevices.forEach(device => {
+        device.disconnected();
+      });
+
+      // Notify the UI that the user has left the meeting
+      browserWindow.webContents.send('leftMeeting');
+
+      ipcMain.off('pluginDisconnected', pluginDisconnected);
+    };
+
+    // @TODO: Remove, old implementation where the plugin generated the join URLs
+    //const bbbMeeting = await createBBBMeeting(joinURLs.control, joinURLs.screens, displayManager, leaveCallback);
+
+    // Get selected layout, fallback to the first layout if not found
+    const layout = Object.values(config.room.layouts).find(el => el.index === layoutIndex) || Object.values(config.room.layouts)[0];
+
+    const bbbMeeting = await createBBBMeeting(joinUrl, layout, displayManager, leftCallback);
+
+    if (bbbMeeting === false) {
+      console.log('failed to join');
+      return;
+    }
+
+    // Callback: Plugin has disconnected
     const pluginDisconnected = async () => {
       console.log('plugin disconnected');
+      /*
       await bbbMeeting.leave();
       hdiDevices.forEach(device => {
         device.disconnected();
       });
       ipcMain.off('pluginDisconnected', pluginDisconnected);
+      */
     };
 
-    const leaveCallback = () => {
-      console.log('should leave software');
-
-      hdiDevices.forEach(device => {
-        device.disconnected();
-      });
-
-      browserWindow.webContents.send('leftMeeting');
-      ipcMain.off('pluginDisconnected', pluginDisconnected);
-    };
-
-    if (!(await bbbMeeting.join(leaveCallback))) {
-      console.log('failed to join');
-    }
+    // Open the screens with the BBB HTML5 Clients
+    bbbMeeting.openScreens();
 
     console.log('joined');
 
     ipcMain.on('pluginDisconnected', pluginDisconnected);
 
-    hdiDevices.forEach(device => {
-      device.connected(async () => {
-        console.log('should leave hardware');
-        await bbbMeeting.leave();
+    // Callback: User requests to leave the meeting using a HDI device
+    const leaveMeeting = async () => {
+      // Leave the meeting
+      await bbbMeeting.leave();
 
-        hdiDevices.forEach(device => {
-          device.disconnected();
-        });
-
-        browserWindow.webContents.send('leftMeeting');
-        ipcMain.off('pluginDisconnected', pluginDisconnected);
+      // Notify all connected HDI devices that the user has left
+      hdiDevices.forEach(device => {
+        device.disconnected();
       });
+
+      // Notify the UI that the user has left the meeting
+      browserWindow.webContents.send('leftMeeting');
+
+      ipcMain.off('pluginDisconnected', pluginDisconnected);
+    };
+
+    // Notify all connected HDI devices that the user has joined the meeting
+    hdiDevices.forEach(device => {
+      device.connected(leaveMeeting);
     });
   });
 
+  // Message from UI to close the app
   ipcMain.on('close', async () => {
     app.quit();
   });
 
+  // Message from UI to that the user has accepted the verification using the UI
   ipcMain.on('verificationAccepted', () => {
     hdiDevices.forEach(device => {
       device.verificationAccepted();
     });
   });
 
+  // Message from UI to that the user has rejected the verification using the UI or the verification has timed out
   ipcMain.on('verificationRejected', () => {
     hdiDevices.forEach(device => {
       device.verificationRejected();
@@ -182,6 +186,30 @@ async function createWindow() {
   return browserWindow;
 }
 
+/**
+ * Get the display for the pin screen
+ * try to get the preferred display of the config, if not found, fallback to the first display
+ */
+function getPINScreen() {
+  // Get display for the pin screen
+  const pinDisplayLabel = config.preferred_pin_screen;
+  if(pinDisplayLabel === undefined) {
+    console.error('Preferred pin screen is not set in the config file');
+  }
+
+  const preferredPinDisplay = displayManager.getDisplay(pinDisplayLabel);
+
+  const pinDisplay = preferredPinDisplay || displayManager.getDisplays()[0];
+
+  if(preferredPinDisplay === null) {
+    console.error(`Preferred pin screen '${pinDisplayLabel}' not found. Falling back to the display '${pinDisplay.label}'`);
+  }
+  else {
+    console.log(`Pin screen set to '${pinDisplayLabel}'`);
+  }
+
+  return pinDisplay;
+}
 /**
  * Restore an existing BrowserWindow or Create a new BrowserWindow.
  */
