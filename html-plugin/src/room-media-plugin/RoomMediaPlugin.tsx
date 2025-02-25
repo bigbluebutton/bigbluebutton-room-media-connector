@@ -18,7 +18,6 @@ import LayoutComponent from './Shared/LayoutComponent';
 
 import { USER_SET_MUTED } from './libs/mutations';
 
-
 export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
     BbbPluginSdk.initialize(uuid);
     const [showModal, setShowModal] = useState<boolean>(false);
@@ -47,6 +46,7 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
     const [apolloClient, setApolloClient] = useState<any>(null);
     const { data: talkingIndicator } = pluginApi.useTalkingIndicator();
     const [isUserMuted, setIsUserMuted] = useState<boolean>(true);
+    const [isRoomDisconnected, setIsRoomDisconnected] = useState<boolean>(false);
 
     const createWebSocket = () => {
 
@@ -109,6 +109,7 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
 
             if (data.type === 'RoomDisconnected') {
                 console.debug('Hybrid-Plugin --- Room disconnected!');
+                setIsRoomDisconnected(true);
             }
 
         };
@@ -129,6 +130,7 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
         setVerificationCodeRejected(false);
         setIsPairing(false);
         setShowModal(false);
+        setIsRoomDisconnected(false);
     }
 
     const handlePinCompletion = (value: string, index: number): void => {
@@ -296,9 +298,31 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
                 }}
             >
 
-                {!verificationCode ?
+                {verificationCodeRejected ? ( // Check for verificationCodeRejected first
                     <>
-                        {isPairing ?
+                        <h4>Verification Code Rejected by Room</h4>
+                        <button
+                            className="button-style"
+                            type="button"
+                            onClick={resetPlugin}
+                        >
+                            Ok
+                        </button>
+                    </>
+                ) : isRoomDisconnected ? ( // Then check for isRoomDisconnected
+                    <>
+                        <h4>Room Disconnected</h4>
+                        <button
+                            className="button-style"
+                            type="button"
+                            onClick={resetPlugin}
+                        >
+                            Ok
+                        </button>
+                    </>
+                ) : !verificationCode ? (
+                    <>
+                        {isPairing ? (
                             <>
                                 <LoaderComponent title="Pairing..." />
                                 <button
@@ -309,113 +333,100 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
                                     Cancel Pairing
                                 </button>
                             </>
-                            :
+                        ) : (
                             <>
                                 <PinComponent
                                     performCompletion={handlePinCompletion}
                                     hasError={pinError}
                                 />
                             </>
-                        }
+                        )}
                     </>
-                    :
-                    !isCodeVerified ?
-                        <>
-                            <h4>Please verify the pairing code and confirm on the appliance</h4>
-                            <h2>{verificationCode}</h2>
-                            <button
-                                className="button-style"
-                                type="button"
-                                onClick={disconnect}
-                            >
-                                Cancel Pairing
-                            </button>
-                        </>
-                        :
-                        verificationCodeRejected ?
+                ) : !isCodeVerified ? (
+                    <>
+                        <h4>Please verify the pairing code and confirm on the appliance</h4>
+                        <h2>{verificationCode}</h2>
+                        <button
+                            className="button-style"
+                            type="button"
+                            onClick={disconnect}
+                        >
+                            Cancel Pairing
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        {status ? (
                             <>
-                                <h4>Verification Code Rejected by Room</h4>
-                                <button
-                                    className="button-style"
-                                    type="button"
-                                    onClick={resetPlugin}
-                                >
-                                    Ok
-                                </button>
-                            </>
-                            :
-                            <>
-                                {status ?
+                                {status == "accepted" && (
                                     <>
-                                        {status == "accepted" &&
-                                            <>
-                                                <LoaderComponent title="Accepted, loading layouts..." />
-                                                <button
-                                                    className="button-style"
-                                                    type="button"
-                                                    onClick={disconnect}
-                                                >
-                                                    Cancel Pairing
-                                                </button>
-                                            </>
-                                        }
-
-                                        {status == "layoutSelection" &&
-                                            <>
-                                                <LayoutComponent
-                                                    layouts={availableLayouts}
-                                                    prepareSelection={layoutSelection}
-                                                />
-                                                <button
-                                                    className="button-style"
-                                                    type="button"
-                                                    onClick={disconnect}
-                                                >
-                                                    Cancel Pairing
-                                                </button>
-                                            </>
-                                        }
-
-                                        {status == "applyingLayout" &&
-                                            <>
-                                                <LoaderComponent title="Applying layout..." />
-                                                <button
-                                                    className="button-style"
-                                                    type="button"
-                                                    onClick={disconnect}
-                                                >
-                                                    Cancel Pairing
-                                                </button>
-                                            </>
-                                        }
-
-                                        {status == "layoutSelected" &&
-                                            <>
-                                                <h3>Room already connected!</h3>
-                                                <button
-                                                    className="button-style"
-                                                    type="button"
-                                                    onClick={disconnect}
-                                                >
-                                                    Disconnect
-                                                </button>
-                                            </>
-                                        }
-                                    </>
-                                    :
-                                    <>
-                                        <h3>Connection declined</h3>
+                                        <LoaderComponent title="Accepted, loading layouts..." />
                                         <button
                                             className="button-style"
                                             type="button"
-                                            onClick={() => setShowModal(false)}
+                                            onClick={disconnect}
                                         >
-                                            Close
+                                            Cancel Pairing
                                         </button>
                                     </>
-                                }
+                                )}
+
+                                {status == "layoutSelection" && (
+                                    <>
+                                        <LayoutComponent
+                                            layouts={availableLayouts}
+                                            prepareSelection={layoutSelection}
+                                        />
+                                        <button
+                                            className="button-style"
+                                            type="button"
+                                            onClick={disconnect}
+                                        >
+                                            Cancel Pairing
+                                        </button>
+                                    </>
+                                )}
+
+                                {status == "applyingLayout" && (
+                                    <>
+                                        <LoaderComponent title="Applying layout..." />
+                                        <button
+                                            className="button-style"
+                                            type="button"
+                                            onClick={disconnect}
+                                        >
+                                            Cancel Pairing
+                                        </button>
+                                    </>
+                                )}
+
+                                {status == "layoutSelected" && (
+                                    <>
+                                        <h3>Room already connected!</h3>
+                                        <button
+                                            className="button-style"
+                                            type="button"
+                                            onClick={disconnect}
+                                        >
+                                            Disconnect
+                                        </button>
+                                    </>
+                                )}
                             </>
-                }
+                        ) : (
+                            <>
+                                <h3>Connection declined</h3>
+                                <button
+                                    className="button-style"
+                                    type="button"
+                                    onClick={() => setShowModal(false)}
+                                >
+                                    Close
+                                </button>
+                            </>
+                        )}
+                    </>
+                )}
             </div>
         </ReactModal>
     );
