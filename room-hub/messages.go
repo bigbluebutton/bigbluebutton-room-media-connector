@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+
 	"github.com/rs/zerolog/log"
 )
 
@@ -21,12 +22,13 @@ const (
 	MessageTypeVerificationCodeResponse MessageType = "VerificationCodeResponse" // the user checks on the appliance if the verification code is correct
 	MessageTypeVerificationCodeAccepted MessageType = "VerificationCodeAccepted" // the server sends a message to the plugin that the verification code was accepted and the config
 	MessageTypeVerificationCodeRejected MessageType = "VerificationCodeRejected" //  the server sends a message to the plugin that the verification code was not accepted
-	MessageTypeJoinURLs                 MessageType = "JoinURLs"                 // the plugin generates join urls for the room appliance, this message is send from the plugin to the server and then forwarded to the appliance
-	MessageTypeRoomDisconnected         MessageType = "RoomDisconnected"         // the server sends a message to the plugin that the room appliance has disconnected
-	MessageTypePluginDisconnected       MessageType = "PluginDisconnected"       // the server sends a message to the plugin that the plugin has disconnected
-	MessageTypeDisconnect               MessageType = "Disconnect"               // disconnect message
-	MessageTypeInvalid                  MessageType = "Invalid"                  // invalid message
-	MessageTypeData                     MessageType = "Data"                     // data message
+	// MessageTypeJoinURLs                 MessageType = "JoinURLs"                 // the plugin generates join urls for the room appliance, this message is send from the plugin to the server and then forwarded to the appliance
+	MessageTypeJoinURL            MessageType = "JoinURL"            // the plugin generates join urls for the room appliance, this message is send from the plugin to the server and then forwarded to the appliance
+	MessageTypeRoomDisconnected   MessageType = "RoomDisconnected"   // the server sends a message to the plugin that the room appliance has disconnected
+	MessageTypePluginDisconnected MessageType = "PluginDisconnected" // the server sends a message to the plugin that the plugin has disconnected
+	MessageTypeDisconnect         MessageType = "Disconnect"         // disconnect message
+	MessageTypeInvalid            MessageType = "Invalid"            // invalid message
+	MessageTypeData               MessageType = "Data"               // data message
 )
 
 // Messages
@@ -92,16 +94,22 @@ type VerificationCodeRejectedMessage struct {
 	Type MessageType `json:"type" validate:"required"`
 }
 
-type JoinURLsMessage struct {
-	Type     MessageType `json:"type" validate:"required"`
-	JoinURLs JoinURLs    `json:"urls" validate:"required"`
+type JoinURLMessage struct {
+	Type        MessageType `json:"type" validate:"required"`
+	JoinURL     string      `json:"joinUrl" validate:"required"`
+	LayoutIndex int         `json:"layoutIndex" validate:"required"`
 }
 
-// JoinURLs can contain one or more URLs.
-type JoinURLs struct {
-	ControlURL string                 `json:"control" validate:"required"`
-	ScreenURLs map[string]interface{} `json:"screens" validate:"required"`
-}
+// type JoinURLsMessage struct {
+// 	Type     MessageType `json:"type" validate:"required"`
+// 	JoinURLs JoinURLs    `json:"urls" validate:"required"`
+// }
+
+// // JoinURLs can contain one or more URLs.
+// type JoinURLs struct {
+// 	ControlURL string                 `json:"control" validate:"required"`
+// 	ScreenURLs map[string]interface{} `json:"screens" validate:"required"`
+// }
 
 // Room Disconnected Message
 type RoomDisconnectedMessage struct {

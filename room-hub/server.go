@@ -257,13 +257,15 @@ func pluginHandler(w http.ResponseWriter, r *http.Request, timeout int) {
 			// Room is verified
 			case "verified":
 
-				joinURLsMessage, err := unmarshalMessage[JoinURLsMessage](message, MessageTypeJoinURLs)
+				// joinURLsMessage, err := unmarshalMessage[JoinURLsMessage](message, MessageTypeJoinURLs)
+				joinURLMessage, err := unmarshalMessage[JoinURLMessage](message, MessageTypeJoinURL)
 				if err != nil {
 					sendInvalidMessage(room)
 					continue
 				}
 
-				room.connect(joinURLsMessage.JoinURLs)
+				// room.connect(joinURLsMessage.JoinURLs)
+				room.connect(joinURLMessage.JoinURL, joinURLMessage.LayoutIndex)
 
 				break
 			case "connected":

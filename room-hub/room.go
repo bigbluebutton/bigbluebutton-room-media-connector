@@ -267,15 +267,33 @@ func (room *Room) sendMessage(message any) bool {
 	return true
 }
 
-func (room *Room) connect(joinUrls JoinURLs) {
+// func (room *Room) connect(joinUrls JoinURLs) {
+
+// 	// Send JoinURLs message to room
+// 	joinURLsMessage := JoinURLsMessage{
+// 		Type:     MessageTypeJoinURLs,
+// 		JoinURLs: joinUrls,
+// 	}
+
+// 	if !room.sendMessage(joinURLsMessage) {
+// 		return
+// 	}
+
+// 	log.Info().Str("room", room.Id).Str("plugin", room.getPlugin().Id).Msg("Connection established, forwarded room links")
+
+// 	room.State = "connected"
+// }
+
+func (room *Room) connect(joinUrl string, layoutIndex int) {
 
 	// Send JoinURLs message to room
-	joinURLsMessage := JoinURLsMessage{
-		Type:     MessageTypeJoinURLs,
-		JoinURLs: joinUrls,
+	joinURLMessage := JoinURLMessage{
+		Type:        MessageTypeJoinURL,
+		JoinURL:     joinUrl,
+		LayoutIndex: layoutIndex,
 	}
 
-	if !room.sendMessage(joinURLsMessage) {
+	if !room.sendMessage(joinURLMessage) {
 		return
 	}
 
