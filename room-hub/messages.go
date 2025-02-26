@@ -51,9 +51,12 @@ type RegisterRoomMessage struct {
 }
 
 type RoomConfig struct {
-	BBBUserName string                 `json:"bbb_user_name" validate:"required"`
-	BBBUserID   string                 `json:"bbb_user_id" validate:"required"`
-	Layouts     map[string]interface{} `json:"layouts" validate:"required"`
+	BBBUserName string   `json:"bbb_user_name" validate:"required"`
+	Layouts     []Layout `json:"layouts" validate:"required"`
+}
+
+type Layout struct {
+	Label string `json:"label" validate:"required"`
 }
 
 type PairingPINUserInputMessage struct {
