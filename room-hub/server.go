@@ -237,7 +237,7 @@ func pluginHandler(w http.ResponseWriter, r *http.Request, timeout int) {
 
 			pairingPINUserInputMessage, err := unmarshalMessage[PairingPINUserInputMessage](message, MessageTypePairingPINUserInput)
 			if err != nil {
-				sendInvalidMessage(room)
+				sendInvalidMessage(plugin)
 				continue
 			}
 
@@ -260,7 +260,7 @@ func pluginHandler(w http.ResponseWriter, r *http.Request, timeout int) {
 				// joinURLsMessage, err := unmarshalMessage[JoinURLsMessage](message, MessageTypeJoinURLs)
 				joinURLMessage, err := unmarshalMessage[JoinURLMessage](message, MessageTypeJoinURL)
 				if err != nil {
-					sendInvalidMessage(room)
+					sendInvalidMessage(plugin)
 					continue
 				}
 
@@ -278,7 +278,7 @@ func pluginHandler(w http.ResponseWriter, r *http.Request, timeout int) {
 
 				dataMessage, err := unmarshalMessage[DataMessage](message, MessageTypeData)
 				if err != nil {
-					sendInvalidMessage(room)
+					sendInvalidMessage(plugin)
 					continue
 				}
 
