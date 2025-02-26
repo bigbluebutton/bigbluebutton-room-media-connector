@@ -1,0 +1,76 @@
+---
+name: 📦 Build Appliance electon app
+on:
+  push:
+#    branches: [ "main"]
+#    paths:
+#      - 'appliance-application/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'appliance-application/**'
+
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js and NPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install system dependencies on Ubuntu
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt -y update
+          sudo apt install -y g++-12 build-essential pkg-config libudev-dev libusb-1.0-0 libusb-1.0-0-dev
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: appliance-application
+
+
+      - name: Build
+        run: npm run compile
+        working-directory: appliance-application
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest'
+        with:
+            name: "BBB-RoomMediaConnector.deb"
+            path: appliance-application/dist/*.deb
+
+      - name: Upload .rpm artifact
+        uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          name: "BBB-RoomMediaConnector.rpm"
+          path: appliance-application/dist/*.rpm
+
+      - name: Upload .exe artifact
+        uses: actions/upload-artifact@v4
+        if: matrix.os == 'windows-latest'
+        with:
+          name: "BBB-RoomMediaConnector.exe"
+          path: appliance-application/dist/*.exe
+
+      - name: Upload .app artifact
+        uses: actions/upload-artifact@v4
+        if: matrix.os == 'macos-latest'
+        with:
+          name: "BBB-RoomMediaConnector.dmg"
+          path: appliance-application/dist/*.dmg

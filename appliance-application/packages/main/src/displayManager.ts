@@ -1,8 +1,7 @@
 import Display = Electron.Display;
-import { screen } from 'electron';
+import {screen} from 'electron';
 
-export class DisplayManager{
-
+export class DisplayManager {
   private displays: Display[];
 
   constructor() {
@@ -13,10 +12,7 @@ export class DisplayManager{
     return this.displays;
   }
 
-  public getDisplay(label: string): Display | null{
+  public getDisplay(label: string): Display | null {
     return this.displays.find(display => display.label === label) || null;
   }
-
-
-
 }

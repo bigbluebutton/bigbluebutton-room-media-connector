@@ -1,9 +1,18 @@
 import {app} from 'electron';
 import './security-restrictions';
-import {restoreOrCreateWindow, hdiDevices } from '/@/mainWindow';
+import {restoreOrCreateWindow} from './mainWindow';
 import {listStreamDecks, openStreamDeck} from '@elgato-stream-deck/node';
-import {StreamDeckHID} from '/@/streamdeck';
+import {StreamDeckHID} from './streamdeck';
+import {autoUpdater} from 'electron-updater';
+import fs from 'fs';
+import {DisplayManager} from './displayManager';
+import type {HID} from './HID';
+import type {Config} from '../../common/config.ts';
 
+export let displayManager: DisplayManager;
+export const hdiDevices: HID[] = [];
+export let config: Config;
+export let configPath: string;
 
 /**
  * Prevent electron from running multiple instances.
@@ -15,24 +24,25 @@ if (!isSingleInstance) {
 }
 app.on('second-instance', restoreOrCreateWindow);
 
-/**
- * Disable Hardware Acceleration to save more system resources.
- */
-app.disableHardwareAcceleration();
-
-/**
- * Shout down background process if all windows was closed
- */
-app.on('window-all-closed', async () => {
-
-
+app.on('window-all-closed', () => {
   app.quit();
 });
 
-app.on('before-quit', async function () {
-  console.log("closing");
-  for (const device of hdiDevices) {
-    await device.close();
+let isQuitting = false;
+
+
+app.on('before-quit', (event: Electron.Event): void => {
+  if (!isQuitting) {
+    event.preventDefault();
+    isQuitting = true;
+
+    const promises = hdiDevices.map(device => {
+      return device.close();
+    });
+
+    Promise.all(promises).then(() => {
+      app.quit();
+    });
   }
 });
 
@@ -46,25 +56,11 @@ app.on('before-quit', async function () {
  */
 app
   .whenReady()
+  .then(loadConfig)
+  .then(loadDisplays)
+  .then(loadHDIDevices)
   .then(restoreOrCreateWindow)
-  .then(async () => {
-    console.log('App is ready');
-
-    try {
-      const allStreamDecks = await listStreamDecks();
-      console.debug('All Streamdecks found: ', allStreamDecks);
-      const myStreamDeck = await openStreamDeck(allStreamDecks[0].path);
-      console.debug('Streamdeck found: ', myStreamDeck);
-      hdiDevices.push(new StreamDeckHID(myStreamDeck));
-    } catch (e) {
-      console.error(e);
-      console.log('No Streamdeck found');
-    }
-
-
-  })
   .catch(e => console.error('Failed create window:', e));
-
 
 /**
  * Check for app updates, install it in background and notify user that new version was installed.
@@ -75,17 +71,50 @@ app
  * if you compile production app without publishing it to distribution server.
  * Like `npm run compile` does. It's ok 😅
  */
+/**
+ * Check for new version of the application - production mode only.
 if (import.meta.env.PROD) {
-  app
-    .whenReady()
-    .then(() =>
-      /**
-       * Here we forced to use `require` since electron doesn't fully support dynamic import in asar archives
-       * @see https://github.com/electron/electron/issues/38829
-       * Potentially it may be fixed by this https://github.com/electron/electron/pull/37535
-       */
-      require('electron-updater').autoUpdater.checkForUpdatesAndNotify(),
-    )
-    .catch(e => console.error('Failed check and install updates:', e));
+  app.
+  whenReady()
+    .then(autoUpdater.checkForUpdatesAndNotify())
+    .catch((e) => console.error('Failed check updates:', e));
+}
+*/
+
+function loadConfig() {
+  // Loading config file
+  const appUserDataPath = app.getPath('userData');
+  configPath = appUserDataPath + '/settings.json';
+  try {
+    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    console.log('Config loaded from ' + configPath);
+  } catch (error) {
+    console.log('Error reading config from ' + configPath, error);
+  }
 }
 
+function loadDisplays() {
+  displayManager = new DisplayManager();
+
+  const allDisplays = displayManager.getDisplays();
+  allDisplays.forEach(display => {
+    console.log(`Found display '${display.label}'`);
+  });
+}
+
+async function loadHDIDevices() {
+  try {
+    const allStreamDeckDevices = await listStreamDecks();
+
+    const streamDecks = allStreamDeckDevices.map(device => {
+      return openStreamDeck(device.path, {resetToLogoOnClose: true});
+    });
+
+    (await Promise.all(streamDecks)).forEach(streamDeck => {
+      console.log('Stream Deck found: ' + streamDeck.PRODUCT_NAME);
+      hdiDevices.push(new StreamDeckHID(streamDeck));
+    });
+  } catch (e) {
+    console.error(e);
+  }
+}

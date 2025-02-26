@@ -4,10 +4,11 @@ import App from '/@/App.vue';
 import '/@/style.css';
 import '../assets/bigbluebutton-font/export/style.css';
 
-const config = await window.electronAPI.getSettings();
+const { config, path }  = await window.electronAPI.getSettings();
 
 const app = createApp(App);
 
 app.provide('config', config);
+app.provide('configPath', path);
 
 app.mount('#app');

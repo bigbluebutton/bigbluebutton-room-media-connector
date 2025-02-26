@@ -6,7 +6,6 @@ import {URL} from 'node:url';
  */
 const ALLOWED_PERMISSIONS = ['media'];
 
-
 app.on('web-contents-created', (_, contents) => {
   /**
    * Block navigation to origins not on the allowlist.
@@ -16,8 +15,7 @@ app.on('web-contents-created', (_, contents) => {
    *
    * @see https://www.electronjs.org/docs/latest/tutorial/security#13-disable-or-limit-navigation
    */
-  contents.on('will-navigate', (event) => {
-
+  contents.on('will-navigate', event => {
     // Prevent navigation
     event.preventDefault();
 

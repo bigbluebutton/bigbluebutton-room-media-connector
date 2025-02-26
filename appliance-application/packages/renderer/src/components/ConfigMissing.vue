@@ -10,14 +10,16 @@
       <h3 class="font-medium text-white">Missing configuration file</h3>
       <div class="mt-2 text-sm text-white">
         <p>Could not find the configuration file in:</p>
-        <p class="mt-2"><i>{{ configPath}}</i></p>
+        <p class="mt-2"
+          ><i>{{ configPath }}</i></p
+        >
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ExclamationTriangleIcon } from '@heroicons/vue/24/solid';
+import {ExclamationTriangleIcon} from '@heroicons/vue/24/solid';
 
 defineProps({
   configPath: String,
