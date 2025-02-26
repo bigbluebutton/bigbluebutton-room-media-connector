@@ -25,8 +25,8 @@ type Layouts = {
 };
 
 type RoomConfig = {
-    bbb_user_name: string;
     bbb_user_id: string;
+    bbb_user_name: string;
     layouts: Layouts;
 };
 
@@ -47,7 +47,7 @@ export { LoaderComponentProps };
 
 interface LayoutComponentProps {
     layouts: Layout[],
-    prepareSelection(index: number): void,
+    layoutIndex(index: number): void,
 }
 export { LayoutComponentProps };
 

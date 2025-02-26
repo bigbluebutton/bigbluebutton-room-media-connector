@@ -31,7 +31,8 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
     };
 
     const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
-    const [filteredLayout, setFilteredLayout] = useState<Layout | null>(null);
+    // const [filteredLayout, setFilteredLayout] = useState<Layout | null>(null);
+    const [layoutIndex, setLayoutIndex] = useState<number | null>(null);
     const [availableLayouts, setAvailableLayouts] = useState<Layout[] | null>(null);
     const [roomConfig, setRoomConfig] = useState<RoomConfig | null>(null);
     const [isCodeVerified, setIsCodeVerified] = useState<boolean | null>(false);
@@ -169,11 +170,13 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
     }
 
     const layoutSelection = async (index: number): Promise<void> => {
-        const filteredLayout = availableLayouts.find((layout) => layout.index === index);
+        // const filteredLayout = availableLayouts.find((layout) => layout.index === index);
         setStatus('applyingLayout');
         await muteCurrentUser();
         pluginApi.uiCommands.conference.setSpeakerLevel({ level: 0 });
-        setFilteredLayout(filteredLayout);
+        // setFilteredLayout(filteredLayout);
+        setLayoutIndex(index);
+        console.debug('Hybrid-Plugin --- Set Layout Index to: ', index);
         setStatus('layoutSelected');
         setPinError(false);
         setPinValue(null);
@@ -223,41 +226,53 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
 
     useEffect(() => {
         const fetchJoinUrls = async () => {
-            if (!filteredLayout) return;
+            if (layoutIndex === null) return;
 
-            const baseJoinParameters = {
-                "fullName": roomConfig.bbb_user_name,
-                "duplicateSession": "false"
-            };
-            const controlJoinUrl: string = await pluginApi.getJoinUrl(
+            // const baseJoinParameters = {
+            //     "fullName": roomConfig.bbb_user_name,
+            //     "duplicateSession": "false"
+            // };
+
+            // const controlJoinUrl: string = await pluginApi.getJoinUrl(
+            //     {
+            //         ...baseJoinParameters
+            //     }
+            // );
+
+            const joinUrl: string = await pluginApi.getJoinUrl(
                 {
-                    ...baseJoinParameters
+                    "fullName": roomConfig.bbb_user_name,
+                    "duplicateSession": "false"
                 }
             );
 
-            const screenJoinUrls: { [key: string]: string } = {};
+            setRoomJoinUrls({
+                "type": "JoinURL", "joinUrl": joinUrl, "layoutIndex": layoutIndex
+            });
 
-            try {
-                await Promise.all(
-                    Object.entries(filteredLayout.screens).map(async ([key, value]) => {
-                        const joinParametersMap = {
-                            ...baseJoinParameters,
-                            ...value['bbb_join_parameters']
-                        };
-                        screenJoinUrls[key] = await pluginApi.getJoinUrl(joinParametersMap);
-                    })
-                );
-                const roomJoinUrls = {
-                    "type": "JoinURLs", "urls": { "control": controlJoinUrl, "screens": screenJoinUrls }
-                };
-                setRoomJoinUrls(roomJoinUrls);
-            } catch (error) {
-                console.error("Hybrid-Plugin --- Room Integration Plugin: Error fetching join URLs:", error);
-            }
+            // const screenJoinUrls: { [key: string]: string } = {};
+
+            // try {
+            //     await Promise.all(
+            //         Object.entries(filteredLayout.screens).map(async ([key, value]) => {
+            //             const joinParametersMap = {
+            //                 ...baseJoinParameters,
+            //                 ...value['bbb_join_parameters']
+            //             };
+            //             screenJoinUrls[key] = await pluginApi.getJoinUrl(joinParametersMap);
+            //         })
+            //     );
+            //     const roomJoinUrls = {
+            //         "type": "JoinURLs", "urls": { "control": controlJoinUrl, "screens": screenJoinUrls }
+            //     };
+            //     setRoomJoinUrls(roomJoinUrls);
+            // } catch (error) {
+            //     console.error("Hybrid-Plugin --- Room Integration Plugin: Error fetching join URLs:", error);
+            // }
         };
 
         fetchJoinUrls();
-    }, [filteredLayout]);
+    }, [layoutIndex]);
 
     useEffect(() => {
         try {
@@ -375,7 +390,7 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
                                     <>
                                         <LayoutComponent
                                             layouts={availableLayouts}
-                                            prepareSelection={layoutSelection}
+                                            layoutIndex={layoutSelection}
                                         />
                                         <button
                                             className="button-style"

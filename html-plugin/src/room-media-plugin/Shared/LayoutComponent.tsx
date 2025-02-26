@@ -39,7 +39,7 @@ export default function LayoutComponent(props: LayoutComponentProps) {
                             <button
                                 className="button-style"
                                 style={buttonStyles}
-                                type="button" onClick={() => props.prepareSelection(layout.index)}
+                                type="button" onClick={() => props.layoutIndex(i)}
                             >
                                 {layout.label}
                             </button>
