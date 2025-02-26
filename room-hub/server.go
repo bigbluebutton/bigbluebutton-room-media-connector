@@ -265,7 +265,7 @@ func pluginHandler(w http.ResponseWriter, r *http.Request, timeout int) {
 				}
 
 				// room.connect(joinURLsMessage.JoinURLs)
-				room.connect(joinURLMessage.JoinURL, joinURLMessage.LayoutIndex)
+				room.connect(joinURLMessage.JoinURL, joinURLMessage.LayoutLabel)
 
 				break
 			case "connected":
