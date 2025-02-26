@@ -32,6 +32,9 @@ async function createWindow() {
     },
   });
 
+  if(config.debug)
+    browserWindow.webContents.openDevTools();
+
   // RPC from the UI to get the settings
   ipcMain.handle('getConfig', () => {
     return {path: configPath, config};
@@ -104,9 +107,10 @@ async function createWindow() {
 
     console.log('joined');
 
-    // Wait 5 sec until unmuting the audio
+    // Wait 5 sec before unmuting the audio
     setTimeout(() => {
         bbbMeeting.unmute();
+        //bbbMeeting.getMediaDevices();
       }, 5000);
 
     ipcMain.on('pluginDisconnected', pluginDisconnected);
@@ -162,9 +166,6 @@ async function createWindow() {
    */
   browserWindow.on('ready-to-show', () => {
     browserWindow?.show();
-
-    if(config.debug)
-      browserWindow?.webContents.openDevTools();
   });
 
   /**

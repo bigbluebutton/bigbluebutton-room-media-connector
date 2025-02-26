@@ -212,7 +212,7 @@ class BBBMeeting {
           contextIsolation: true,
         },
       });
-      //screenWindow?.webContents.openDevTools();
+      //screenWindow.webContents.openDevTools();
 
       this.windows.push(screenWindow);
 
@@ -230,6 +230,26 @@ class BBBMeeting {
 
   public unmute() {
     this.executeJavaScriptInMediaScreen('document.querySelectorAll(\'button[data-test="unmuteMicButton"]\')[0].click()').then(r => console.log(r));
+  }
+
+  public async getMediaDevices() {
+    const command = `
+      new Promise((resolve) => {
+        navigator.mediaDevices.enumerateDevices().then((devices) => {
+          const videoDevices = devices
+            .filter(device => device.kind == 'videoinput')
+            .map(device => {
+              return {
+                label: device.label,
+                deviceId: device.deviceId,
+              };
+            });
+          resolve(videoDevices)
+        });
+      });
+    `;
+
+    return await this.executeJavaScriptInMediaScreen(command);
   }
 
   private async executeJavaScriptInMediaScreen(command: string) {
