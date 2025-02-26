@@ -33,7 +33,7 @@ Place the settings config file `settings.json` in the following folder:
 
 2. Customize the config file:
 
-- You have to adjust the `control_server.ws` setting to point to the `/ws_room` route of the pairing server (e.g. `https://your-bbb-server.org/hybrid/ws_room` if you follow the [instructions](../pairing-server/) and install the pairing server on a bbb host).
+- You have to adjust the `control_server.ws` setting to point to the `/ws_room` route of the pairing server (e.g. `https://your-bbb-server.org/hybrid/ws_room` if you follow the [instructions](../room-hub/) and install the pairing server on a bbb host).
 - Next `room.name` should be set to the name of the room that should be shown during the pairing process.
 - You can also set `preferred_pin_screen` to the name of the screen that should be used to display the pairing pin. If the screen it not found, it uses the first screen it finds.
 - Lastly you need to define the layouts, a few examples are provided in `room.layouts`.
