@@ -284,13 +284,13 @@ func (room *Room) sendMessage(message any) bool {
 // 	room.State = "connected"
 // }
 
-func (room *Room) connect(joinUrl string, layoutLabel string) {
+func (room *Room) connect(joinUrl string, layoutIndex int) {
 
 	// Send JoinURLs message to room
 	joinURLMessage := JoinURLMessage{
 		Type:        MessageTypeJoinURL,
 		JoinURL:     joinUrl,
-		LayoutLabel: layoutLabel,
+		LayoutIndex: layoutIndex,
 	}
 
 	if !room.sendMessage(joinURLMessage) {
