@@ -100,6 +100,7 @@ class BBBMeeting {
   private windows: BrowserWindow[];
   private apolloClient: ApolloClient<NormalizedCacheObject>;
   private bbbGraphQl: BBBGraphQl;
+  private mediaScreen: {url: string, window: BrowserWindow};
 
   constructor(screens: {[key: string]: string}, displayManager: DisplayManager, leftCallback: () => void, bbbGraphQl: BBBGraphQl) {
     this.screens = screens;
@@ -119,7 +120,7 @@ class BBBMeeting {
   private onUsersLeft(callback: () => void) {
 
     const getMeetingEndData = gql`
-      query getMeetingEndData {
+      subscription getUserCurrent {
         user_current {
           isModerator
           logoutUrl
@@ -140,7 +141,11 @@ class BBBMeeting {
       })
       .subscribe({
         next(data) {
-          console.log("Meeting end data", JSON.stringify(data));
+          console.log('getMeetingEndData', JSON.stringify(data));
+          if(data.data.user_current[0].meeting.ended === true){
+            console.log('Meeting ended');
+            callback();
+          }
         },
         error(err) {
           console.error('err meeting ended', err);
@@ -207,11 +212,29 @@ class BBBMeeting {
           contextIsolation: true,
         },
       });
+      //screenWindow?.webContents.openDevTools();
 
       this.windows.push(screenWindow);
 
       screenWindow.loadURL(url);
 
+      if(url.includes('userdata-bbb_auto_join_audio=true')) {
+        this.mediaScreen = {url: url, window: screenWindow};
+      }
+    }
+  }
+
+  public mute() {
+    this.executeJavaScriptInMediaScreen('document.querySelectorAll(\'button[data-test="muteMicButton"]\')[0].click()').then(r => console.log(r));
+  }
+
+  public unmute() {
+    this.executeJavaScriptInMediaScreen('document.querySelectorAll(\'button[data-test="unmuteMicButton"]\')[0].click()').then(r => console.log(r));
+  }
+
+  private async executeJavaScriptInMediaScreen(command: string) {
+    if(this.mediaScreen.window) {
+      return await this.mediaScreen.window.webContents.executeJavaScript(command);
     }
   }
 

@@ -77,8 +77,8 @@ async function createWindow() {
     // @TODO: Remove, old implementation where the plugin generated the join URLs
     //const bbbMeeting = await createBBBMeeting(joinURLs.control, joinURLs.screens, displayManager, leaveCallback);
 
-    // Get selected layout, fallback to the first layout if not found
-    const layout = Object.values(config.room.layouts).find(el => el.index === layoutIndex) || Object.values(config.room.layouts)[0];
+    // Get selected layout
+    const layout = config.room.layouts[layoutIndex];
 
     const bbbMeeting = await createBBBMeeting(joinUrl, layout, displayManager, leftCallback);
 
@@ -103,6 +103,11 @@ async function createWindow() {
     bbbMeeting.openScreens();
 
     console.log('joined');
+
+    // Wait 5 sec until unmuting the audio
+    setTimeout(() => {
+        bbbMeeting.unmute();
+      }, 5000);
 
     ipcMain.on('pluginDisconnected', pluginDisconnected);
 

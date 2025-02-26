@@ -18,6 +18,7 @@ export class BBBGraphQl {
   private sessionToken: string | null = null;
   private host: string = '';
   private authToken: string = '';
+  private userId: string = '';
   private apolloClient: ApolloClient<NormalizedCacheObject> | undefined;
   private graphQlClient: Client;
 
@@ -87,6 +88,7 @@ export class BBBGraphQl {
       query getUserCurrent {
         user_current {
           authToken
+          userId
         }
       }
     `;
@@ -99,6 +101,7 @@ export class BBBGraphQl {
     if (data && data?.user_current?.[0]?.authToken) {
       console.log('IN getAuthToken: ', data);
       this.authToken = data.user_current[0].authToken;
+      this.userId = data.user_current[0].userId;
       return true;
     }
 
@@ -262,5 +265,9 @@ export class BBBGraphQl {
       this.apolloClient.stop();
       this.graphQlClient.dispose();
     }
+  }
+
+  public getUserId() {
+    return this.userId;
   }
 }

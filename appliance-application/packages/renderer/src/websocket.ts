@@ -43,7 +43,14 @@ export default class BBBWebSocket {
         this.connection?.send(
           JSON.stringify({
             type: 'RegisterRoom',
-            roomConfig: this.roomConfig,
+            roomConfig: {
+              bbb_user_name: this.roomConfig.bbb_user_name,
+              layouts: this.roomConfig.layouts.map(layout => {
+                return {
+                  label: layout.label,
+                };
+              }),
+            },
           }),
         );
 
