@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
-import { RoomMediaPlugin } from './room-media-plugin/component';
+import { RoomMediaPlugin } from './room-media-plugin/RoomMediaPlugin';
 
 const uuid = document.currentScript?.getAttribute('uuid') || 'root';
 
