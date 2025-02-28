@@ -12,7 +12,7 @@ export class DisplayManager {
     return this.displays;
   }
 
-  public getDisplay(label: string): Display | null {
-    return this.displays.find(display => display.label === label) || null;
+  public getDisplay(identifier: string | number): Display | null {
+    return this.displays.find(display => display.id === Number(identifier) || display.label === identifier) || null;
   }
 }
