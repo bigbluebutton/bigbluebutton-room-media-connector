@@ -98,7 +98,11 @@ function loadDisplays() {
 
   const allDisplays = displayManager.getDisplays();
   allDisplays.forEach(display => {
-    console.log(`Found display '${display.label}'`);
+    console.log('Found display with display attributes:', {
+      id: display.id,
+      label: display.label,
+      size: display.size
+    });
   });
 }
 
