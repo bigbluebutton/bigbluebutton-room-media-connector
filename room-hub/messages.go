@@ -100,7 +100,7 @@ type VerificationCodeRejectedMessage struct {
 type JoinURLMessage struct {
 	Type        MessageType `json:"type" validate:"required"`
 	JoinURL     string      `json:"joinUrl" validate:"required"`
-	LayoutIndex int         `json:"layoutIndex" validate:"required"`
+	LayoutIndex int         `json:"layoutIndex" validate:"gte=0"`
 }
 
 // type JoinURLsMessage struct {
