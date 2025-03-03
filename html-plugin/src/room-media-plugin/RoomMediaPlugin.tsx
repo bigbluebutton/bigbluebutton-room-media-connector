@@ -1,7 +1,7 @@
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as ReactModal from 'react-modal';
-import { pluginApolloClient } from './libs/apolloClient'
+import { pluginApolloClient } from './libs/apolloClient';
 import './style.css';
 
 import {
@@ -30,8 +30,7 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
         pairingWebsocketUrl: "wss://plugins-bigbluebutton-openstack.uni-osnabrueck.de/room-hub/ws_plugin",
     };
 
-    const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
-    // const [filteredLayout, setFilteredLayout] = useState<Layout | null>(null);
+    const webSocketRef = useRef<WebSocket | null>(null);
     const [layoutIndex, setLayoutIndex] = useState<number | null>(null);
     const [availableLayouts, setAvailableLayouts] = useState<Layout[] | null>(null);
     const [roomConfig, setRoomConfig] = useState<RoomConfig | null>(null);
@@ -120,9 +119,7 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
             resetPlugin();
         };
 
-        setWebSocket(ws);
-
-        return ws;
+        webSocketRef.current = ws;
     };
 
     const resetPlugin = () => {
@@ -132,7 +129,8 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
         setIsPairing(false);
         setShowModal(false);
         setIsRoomDisconnected(false);
-    }
+        setLayoutIndex(null);
+    };
 
     const handlePinCompletion = (value: string, index: number): void => {
         if (index === 5) { // Make sure it happens at the end of the pin (6th)
@@ -167,31 +165,28 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
                 },
             });
         }
-    }
+    };
 
     const layoutSelection = async (index: number): Promise<void> => {
-        // const filteredLayout = availableLayouts.find((layout) => layout.index === index);
         setStatus('applyingLayout');
         await muteCurrentUser();
         pluginApi.uiCommands.conference.setSpeakerLevel({ level: 0 });
-        // setFilteredLayout(filteredLayout);
         setLayoutIndex(index);
         console.debug('Hybrid-Plugin --- Set Layout Index to: ', index);
         setStatus('layoutSelected');
         setPinError(false);
         setPinValue(null);
         setShowModal(false);
-    }
+    };
 
     const disconnect = async (): Promise<void> => {
         pluginApi.uiCommands.conference.setSpeakerLevel({ level: 1 });
-        if (webSocket) {
+        if (webSocketRef.current) {
             console.debug('Hybrid-Plugin --- Sending disconnect message');
-            webSocket.send(JSON.stringify({ type: 'Disconnect' }));
-            webSocket.close();
-            setWebSocket(null);
-        }
-        else {
+            webSocketRef.current.send(JSON.stringify({ type: 'Disconnect' }));
+            webSocketRef.current.close();
+            webSocketRef.current = null;
+        } else {
             console.error('Hybrid-Plugin --- Room Integration Plugin: Websocket not available for disconnect');
         }
     };
@@ -205,7 +200,7 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
             });
             const apolloClient = await pluginApolloClient(joinUrl, pluginApi.getSessionToken());
             setApolloClient(apolloClient);
-        }
+        };
 
         if (currentUser?.role == "MODERATOR") {
             pluginApi.setActionButtonDropdownItems([
@@ -228,47 +223,14 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
         const fetchJoinUrls = async () => {
             if (layoutIndex === null) return;
 
-            // const baseJoinParameters = {
-            //     "fullName": roomConfig.bbb_user_name,
-            //     "duplicateSession": "false"
-            // };
-
-            // const controlJoinUrl: string = await pluginApi.getJoinUrl(
-            //     {
-            //         ...baseJoinParameters
-            //     }
-            // );
-
-            const joinUrl: string = await pluginApi.getJoinUrl(
-                {
-                    "fullName": roomConfig.bbb_user_name,
-                    "duplicateSession": "false"
-                }
-            );
+            const joinUrl: string = await pluginApi.getJoinUrl({
+                "fullName": roomConfig.bbb_user_name,
+                "duplicateSession": "false"
+            });
 
             setRoomJoinUrls({
                 "type": "JoinURL", "joinUrl": joinUrl, "layoutIndex": layoutIndex
             });
-
-            // const screenJoinUrls: { [key: string]: string } = {};
-
-            // try {
-            //     await Promise.all(
-            //         Object.entries(filteredLayout.screens).map(async ([key, value]) => {
-            //             const joinParametersMap = {
-            //                 ...baseJoinParameters,
-            //                 ...value['bbb_join_parameters']
-            //             };
-            //             screenJoinUrls[key] = await pluginApi.getJoinUrl(joinParametersMap);
-            //         })
-            //     );
-            //     const roomJoinUrls = {
-            //         "type": "JoinURLs", "urls": { "control": controlJoinUrl, "screens": screenJoinUrls }
-            //     };
-            //     setRoomJoinUrls(roomJoinUrls);
-            // } catch (error) {
-            //     console.error("Hybrid-Plugin --- Room Integration Plugin: Error fetching join URLs:", error);
-            // }
         };
 
         fetchJoinUrls();
@@ -276,28 +238,27 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
 
     useEffect(() => {
         try {
-            if (roomJoinUrls) {
+            if (roomJoinUrls && webSocketRef.current?.readyState === WebSocket.OPEN) {
                 console.debug('Hybrid-Plugin --- Sending join urls via WebSocket:', JSON.stringify(roomJoinUrls));
-                webSocket.send(JSON.stringify(roomJoinUrls));
+                webSocketRef.current.send(JSON.stringify(roomJoinUrls));
             }
         } catch (error) {
             console.error('Hybrid-Plugin --- Room Integration Plugin: Error sending urls via WebSocket:', error);
         }
-    }, [webSocket, roomJoinUrls]);
+    }, [roomJoinUrls]);
 
-    // Add a useEffect to send a ping message every 30 seconds
     useEffect(() => {
-        if (webSocket) {
+        if (webSocketRef.current) {
             const interval = setInterval(() => {
-                if (webSocket.readyState === WebSocket.OPEN) {
-                    webSocket.send(JSON.stringify({ type: 'Ping' }));
+                if (webSocketRef.current?.readyState === WebSocket.OPEN) {
+                    webSocketRef.current.send(JSON.stringify({ type: 'Ping' }));
                     console.debug('Hybrid-Plugin --- Sending ping message via WebSocket');
                 }
             }, 20000); // 20 seconds
 
             return () => clearInterval(interval);
         }
-    }, [webSocket]);
+    }, [webSocketRef.current]);
 
     return (
         <ReactModal
