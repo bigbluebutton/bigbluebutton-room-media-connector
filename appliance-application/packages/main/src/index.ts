@@ -8,6 +8,7 @@ import fs from 'fs';
 import {DisplayManager} from './displayManager';
 import type {HID} from './HID';
 import type {Config} from '../../common/config.ts';
+import {KeyboardHID} from '/@/keyboard';
 
 export let displayManager: DisplayManager;
 export const hdiDevices: HID[] = [];
@@ -120,5 +121,10 @@ async function loadHDIDevices() {
     });
   } catch (e) {
     console.error(e);
+  }
+
+  if(config.keyboard_hid) {
+    hdiDevices.push(new KeyboardHID());
+    console.log('Keyboard HID registered');
   }
 }
