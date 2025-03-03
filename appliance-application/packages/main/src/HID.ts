@@ -4,9 +4,15 @@ export interface HID {
   verificationAccepted(): void;
   verificationRejected(): void;
 
-  connected(leave: () => void): void;
+  connected(actions: HIDActions): void;
 
   disconnected(): void;
 
   close(): Promise<void>;
+}
+
+export interface HIDActions {
+  leave: () => void;
+  mute: () => void;
+  unmute: () => void;
 }
