@@ -100,7 +100,6 @@ export class StreamDeckHID implements HID {
         }
         if (control.row == rows && control.column == columns) {
           StreamDeckHID.LEAVE_BUTTON = control;
-          StreamDeckHID.MUTE_BUTTON = control;
         }
         if (control.row == 1 && control.column == 0) {
           StreamDeckHID.ACCEPT_BUTTON = control;
@@ -108,6 +107,7 @@ export class StreamDeckHID implements HID {
         }
         if (control.row == 1 && control.column == 1) {
           StreamDeckHID.REJECT_BUTTON = control;
+          StreamDeckHID.MUTE_BUTTON = control;
         }
       }
     });
