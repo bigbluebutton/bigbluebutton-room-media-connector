@@ -59,7 +59,7 @@ export async function createBBBMeeting(control: string, screens: Array<string>, 
   return new BBBMeeting(screens, displayManager, leftCallback, bbbGraphQl);
 }
 */
-export async function createBBBMeeting(control: string, layout: Layout, displayManager: DisplayManager, leftCallback: () => void) {
+export async function createBBBMeeting(control: string, displayManager: DisplayManager, leftCallback: () => void) {
 
   const bbbGraphQl = new BBBGraphQl(control);
   const connected = await bbbGraphQl.connect(leftCallback);
@@ -68,33 +68,12 @@ export async function createBBBMeeting(control: string, layout: Layout, displayM
 
   console.log('connected to graphql');
 
-  console.log('layout', layout.label);
-
-  const screens: {[key: string]: string} = {};
-  for (const [key, value] of Object.entries(layout.screens)) {
-    console.log(key, value);
-
-    const joinUrl = await bbbGraphQl.getJoinURL({
-      sessionName: key,
-      duplicateSession: false,
-      ...value.bbb_join_parameters,
-    });
-
-    console.log('status', joinUrl.status);
-    console.log('statusText', joinUrl.statusText);
-    console.log('data', JSON.stringify(joinUrl.data));
-    console.log('headers', JSON.stringify(joinUrl.headers));
-    console.log('config', JSON.stringify(joinUrl.config));
-
-    screens[key] = joinUrl.data.response.url;
-  }
-
-  return new BBBMeeting(screens, displayManager, leftCallback, bbbGraphQl);
+  return new BBBMeeting(displayManager, leftCallback, bbbGraphQl);
 }
 
 
 class BBBMeeting {
-  private readonly screens: {[key: string]: string};
+  private screens: {[key: string]: string};
   private displayManager: DisplayManager;
 
   private windows: BrowserWindow[];
@@ -102,8 +81,7 @@ class BBBMeeting {
   private bbbGraphQl: BBBGraphQl;
   private mediaScreen: {url: string, window: BrowserWindow};
 
-  constructor(screens: {[key: string]: string}, displayManager: DisplayManager, leftCallback: () => void, bbbGraphQl: BBBGraphQl) {
-    this.screens = screens;
+  constructor(displayManager: DisplayManager, leftCallback: () => void, bbbGraphQl: BBBGraphQl) {
     this.displayManager = displayManager;
     this.windows = [];
     this.bbbGraphQl = bbbGraphQl;
@@ -187,7 +165,34 @@ class BBBMeeting {
       });
   }
 
-  public openScreens() {
+  public async openScreens(layout: Layout) {
+    console.log('layout', layout.label);
+
+    this.windows.forEach(window => {
+      window.close();
+      window.destroy();
+    });
+    this.mediaScreen = undefined;
+
+    this.screens = {};
+    for (const [key, value] of Object.entries(layout.screens)) {
+      console.log(key, value);
+
+      const joinUrl = await this.bbbGraphQl.getJoinURL({
+        sessionName: key,
+        duplicateSession: false,
+        ...value.bbb_join_parameters,
+      });
+
+      console.log('status', joinUrl.status);
+      console.log('statusText', joinUrl.statusText);
+      console.log('data', JSON.stringify(joinUrl.data));
+      console.log('headers', JSON.stringify(joinUrl.headers));
+      console.log('config', JSON.stringify(joinUrl.config));
+
+      this.screens[key] = joinUrl.data.response.url;
+    }
+
     for (const [screen, url] of Object.entries(this.screens)) {
       const screenDisplay = this.displayManager.getDisplay(screen);
 
@@ -216,9 +221,9 @@ class BBBMeeting {
 
       this.windows.push(screenWindow);
 
-      screenWindow.loadURL(url);
+      await screenWindow.loadURL(url);
 
-      if(url.includes('userdata-bbb_auto_join_audio=true')) {
+      if (url.includes('userdata-bbb_auto_join_audio=true')) {
         this.mediaScreen = {url: url, window: screenWindow};
       }
     }
@@ -253,7 +258,7 @@ class BBBMeeting {
   }
 
   private async executeJavaScriptInMediaScreen(command: string) {
-    if(this.mediaScreen.window) {
+    if(this.mediaScreen) {
       return await this.mediaScreen.window.webContents.executeJavaScript(command);
     }
   }

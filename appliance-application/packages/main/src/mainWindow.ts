@@ -83,7 +83,7 @@ async function createWindow() {
     // Get selected layout
     const layout = config.room.layouts[layoutIndex];
 
-    const bbbMeeting = await createBBBMeeting(joinUrl, layout, displayManager, leftCallback);
+    const bbbMeeting = await createBBBMeeting(joinUrl, displayManager, leftCallback);
 
     if (bbbMeeting === false) {
       console.log('failed to join');
@@ -103,7 +103,13 @@ async function createWindow() {
     };
 
     // Open the screens with the BBB HTML5 Clients
-    bbbMeeting.openScreens();
+    await bbbMeeting.openScreens(layout);
+
+    const otherLayout = config.room.layouts[2];
+    // wait 20 sec before opening the other layout
+    setTimeout(async () => {
+      await bbbMeeting.openScreens(otherLayout);
+    }, 20*1000);
 
     console.log('joined');
 
