@@ -8,6 +8,7 @@ export type Config = {
   preferred_pin_screen: string;
   hide_close_button: boolean;
   debug: boolean;
+  keyboard_hid: boolean;
   room: RoomConfig;
 };
 export type RoomConfig = {

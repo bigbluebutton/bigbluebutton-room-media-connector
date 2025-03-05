@@ -131,9 +131,18 @@ async function createWindow() {
       ipcMain.off('pluginDisconnected', pluginDisconnected);
     };
 
+
     // Notify all connected HDI devices that the user has joined the meeting
     hdiDevices.forEach(device => {
-      device.connected(leaveMeeting);
+      device.connected({
+        leave: leaveMeeting,
+        mute: () => {
+          bbbMeeting.mute();
+        },
+        unmute: () => {
+          bbbMeeting.unmute();
+        },
+      });
     });
   });
 

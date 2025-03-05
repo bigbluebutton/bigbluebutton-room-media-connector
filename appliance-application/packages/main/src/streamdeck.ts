@@ -1,8 +1,8 @@
 import * as path from 'path';
-import sharp from 'sharp';
+import sharp, {Sharp} from 'sharp';
 import type {StreamDeck} from '@elgato-stream-deck/node';
 import {fileURLToPath} from 'url';
-import type {HID} from './HID';
+import type {HID, HIDActions} from './HID';
 import type {StreamDeckButtonControlDefinitionLcdFeedback} from '@elgato-stream-deck/core/dist/controlDefinition';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -13,6 +13,8 @@ export class StreamDeckHID implements HID {
   static ACCEPT_BUTTON: StreamDeckButtonControlDefinitionLcdFeedback;
   static REJECT_BUTTON: StreamDeckButtonControlDefinitionLcdFeedback;
   static LEAVE_BUTTON: StreamDeckButtonControlDefinitionLcdFeedback;
+  static MUTE_BUTTON: StreamDeckButtonControlDefinitionLcdFeedback;
+  static UNMUTE_BUTTON: StreamDeckButtonControlDefinitionLcdFeedback;
 
   private streamDeck: StreamDeck;
 
@@ -21,6 +23,8 @@ export class StreamDeckHID implements HID {
   private ACCEPT_IMG;
   private REJECT_IMG;
   private LEAVE_IMG;
+  private MUTE_IMG;
+  private UNMUTE_IMG;
 
   private hasVerificationPending = false;
 
@@ -28,6 +32,8 @@ export class StreamDeckHID implements HID {
   private rejectCallback: () => void;
 
   private leaveCallback: () => void;
+  private muteCallback: () => void;
+  private unmuteCallback: () => void;
   private isConnected: boolean;
 
   constructor(streamDeck: StreamDeck) {
@@ -44,22 +50,30 @@ export class StreamDeckHID implements HID {
     this.streamDeck.on('up', button => {
       console.log('key %d up', button.index);
 
-      if (button.index === StreamDeckHID.ACCEPT_BUTTON.index && this.hasVerificationPending) {
-        this.hasVerificationPending = false;
-        this.hideVerificationButtons();
-        this.acceptCallback();
+      if(this.hasVerificationPending){
+        if (button.index === StreamDeckHID.ACCEPT_BUTTON.index) {
+          this.acceptCallback();
+        }
+
+        if (button.index === StreamDeckHID.REJECT_BUTTON.index) {
+          this.rejectCallback();
+        }
       }
 
-      if (button.index === StreamDeckHID.REJECT_BUTTON.index && this.hasVerificationPending) {
-        this.hasVerificationPending = false;
-        this.hideVerificationButtons();
-        this.rejectCallback();
+      if(this.isConnected){
+        if (button.index === StreamDeckHID.MUTE_BUTTON.index) {
+          this.muteCallback();
+        }
+
+        if (button.index === StreamDeckHID.UNMUTE_BUTTON.index) {
+          this.unmuteCallback();
+        }
+
+        if (button.index === StreamDeckHID.LEAVE_BUTTON.index) {
+          this.leaveCallback();
+        }
       }
 
-      if (button.index === StreamDeckHID.LEAVE_BUTTON.index) {
-        this.isConnected = true;
-        this.leaveCallback();
-      }
     });
 
     this.streamDeck.on('error', error => {
@@ -89,18 +103,21 @@ export class StreamDeckHID implements HID {
         }
         if (control.row == 1 && control.column == 0) {
           StreamDeckHID.ACCEPT_BUTTON = control;
+          StreamDeckHID.UNMUTE_BUTTON = control;
         }
         if (control.row == 1 && control.column == 1) {
           StreamDeckHID.REJECT_BUTTON = control;
+          StreamDeckHID.MUTE_BUTTON = control;
         }
       }
     });
 
-    this.BBB_IMG = await sharp(path.resolve(__dirname, '../assets/bbb.png'))
-      .flatten()
-      .resize(StreamDeckHID.BBB_BUTTON.pixelSize.width, StreamDeckHID.BBB_BUTTON.pixelSize.height)
-      .raw()
-      .toBuffer();
+    this.BBB_IMG = await this.getButtonImageBuffer(StreamDeckHID.BBB_BUTTON, 'bbb.png');
+    this.ACCEPT_IMG = await this.getButtonImageBuffer(StreamDeckHID.ACCEPT_BUTTON, 'accept.png');
+    this.REJECT_IMG = await this.getButtonImageBuffer(StreamDeckHID.REJECT_BUTTON, 'reject.png');
+    this.LEAVE_IMG = await this.getButtonImageBuffer(StreamDeckHID.LEAVE_BUTTON, 'leave.png');
+    this.MUTE_IMG = await this.getButtonImageBuffer(StreamDeckHID.MUTE_BUTTON, 'mute.png');
+    this.UNMUTE_IMG = await this.getButtonImageBuffer(StreamDeckHID.UNMUTE_BUTTON, 'unmute.png');
 
     this.BBB_IMG_LG = await sharp(path.resolve(__dirname, '../assets/bbb.png'))
       .flatten()
@@ -114,31 +131,12 @@ export class StreamDeckHID implements HID {
       )
       .raw()
       .toBuffer();
+  }
 
-    this.ACCEPT_IMG = await sharp(path.resolve(__dirname, '../assets/accept.png'))
+  async getButtonImageBuffer(button: StreamDeckButtonControlDefinitionLcdFeedback, image: string): Promise<Buffer> {
+    return sharp(path.resolve(__dirname, '../assets/'+image))
       .flatten()
-      .resize(
-        StreamDeckHID.ACCEPT_BUTTON.pixelSize.width,
-        StreamDeckHID.ACCEPT_BUTTON.pixelSize.height,
-      )
-      .raw()
-      .toBuffer();
-
-    this.REJECT_IMG = await sharp(path.resolve(__dirname, '../assets/reject.png'))
-      .flatten()
-      .resize(
-        StreamDeckHID.REJECT_BUTTON.pixelSize.width,
-        StreamDeckHID.REJECT_BUTTON.pixelSize.height,
-      )
-      .raw()
-      .toBuffer();
-
-    this.LEAVE_IMG = await sharp(path.resolve(__dirname, '../assets/leave.png'))
-      .flatten()
-      .resize(
-        StreamDeckHID.LEAVE_BUTTON.pixelSize.width,
-        StreamDeckHID.LEAVE_BUTTON.pixelSize.height,
-      )
+      .resize(button.pixelSize.width, button.pixelSize.height)
       .raw()
       .toBuffer();
   }
@@ -185,14 +183,18 @@ export class StreamDeckHID implements HID {
     await this.streamDeck.close();
   }
 
-  connected(leave: () => void): void {
+  connected(actions: HIDActions): void {
     this.streamDeck.clearPanel();
 
     this.streamDeck.fillKeyBuffer(StreamDeckHID.BBB_BUTTON.index, this.BBB_IMG);
+    this.streamDeck.fillKeyBuffer(StreamDeckHID.MUTE_BUTTON.index, this.MUTE_IMG);
+    this.streamDeck.fillKeyBuffer(StreamDeckHID.UNMUTE_BUTTON.index, this.UNMUTE_IMG);
     this.streamDeck.fillKeyBuffer(StreamDeckHID.LEAVE_BUTTON.index, this.LEAVE_IMG);
 
     this.isConnected = true;
-    this.leaveCallback = leave;
+    this.muteCallback = actions.mute;
+    this.unmuteCallback = actions.unmute;
+    this.leaveCallback = actions.leave;
   }
 
   disconnected(): void {
