@@ -168,10 +168,6 @@ class BBBMeeting {
   public async openScreens(layout: Layout) {
     console.log('layout', layout.label);
 
-    this.windows.forEach(window => {
-      window.close();
-      window.destroy();
-    });
     this.mediaScreen = undefined;
 
     this.screens = {};
@@ -193,6 +189,8 @@ class BBBMeeting {
       this.screens[key] = joinUrl.data.response.url;
     }
 
+    const newWindows = [];
+
     for (const [screen, url] of Object.entries(this.screens)) {
       const screenDisplay = this.displayManager.getDisplay(screen);
 
@@ -205,28 +203,44 @@ class BBBMeeting {
 
       const partition = 'persist:windows-' + this.windows.length;
 
-      const screenWindow = new BrowserWindow({
-        show: true,
-        width: screenDisplay.size.width,
-        height: screenDisplay.size.height,
-        x: screenDisplay.bounds.x,
-        y: screenDisplay.bounds.y,
-        fullscreen: true,
-        webPreferences: {
-          partition: partition,
-          contextIsolation: true,
-        },
-      });
-      //screenWindow.webContents.openDevTools();
-
-      this.windows.push(screenWindow);
-
+      // Get old window if exists
+      let screenWindow = this.windows.shift();
+      if(screenWindow == undefined) {
+        screenWindow = new BrowserWindow({
+          show: true,
+          width: screenDisplay.size.width,
+          height: screenDisplay.size.height,
+          x: screenDisplay.bounds.x,
+          y: screenDisplay.bounds.y,
+          fullscreen: true,
+          webPreferences: {
+            partition: partition,
+            contextIsolation: true,
+          },
+        });
+      }
       await screenWindow.loadURL(url);
+
+      newWindows.push(screenWindow);
 
       if (url.includes('userdata-bbb_auto_join_audio=true')) {
         this.mediaScreen = {url: url, window: screenWindow};
       }
+
+
     }
+
+    // Close all unused windows
+    this.windows.forEach(window => {
+      window.close();
+      window.destroy();
+    });
+
+    this.windows = newWindows;
+
+
+
+
   }
 
   public mute() {
