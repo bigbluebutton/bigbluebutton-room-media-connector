@@ -4,6 +4,7 @@ import {gql} from '@apollo/client/core';
 import {BBBGraphQl} from './BBBGraphQl';
 import type {DisplayManager} from './displayManager';
 import type {Layout} from '../../common/config';
+import { v7 as uuid } from 'uuid';
 /*
 export async function createBBBMeeting(control: string, screens: Array<string>, displayManager: DisplayManager, leftCallback: () => void) {
 
@@ -201,7 +202,7 @@ class BBBMeeting {
 
       console.log('screenDisplay', screenDisplay);
 
-      const partition = 'persist:windows-' + this.windows.length;
+      const partition = 'persist:windows-' + uuid();
 
       // Get old window if exists
       let screenWindow = this.windows.shift();
