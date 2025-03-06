@@ -31,8 +31,6 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
     };
 
     const webSocketRef = useRef<WebSocket | null>(null);
-    const [layoutIndex, setLayoutIndex] = useState<number | null>(null);
-    const [availableLayouts, setAvailableLayouts] = useState<Layout[] | null>(null);
     const [roomConfig, setRoomConfig] = useState<RoomConfig | null>(null);
     const [isCodeVerified, setIsCodeVerified] = useState<boolean | null>(false);
     const [verificationCode, setVerificationCode] = useState<string | null>(null);
@@ -42,7 +40,6 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
     const [pinValue, setPinValue] = useState<string | null>(null);
     const [pinError, setPinError] = useState<boolean>(false);
     const [isPairing, setIsPairing] = useState<boolean>(false);
-    const [status, setStatus] = useState<string | null>(null);
     const [apolloClient, setApolloClient] = useState<any>(null);
     const { data: talkingIndicator } = pluginApi.useTalkingIndicator();
     const [isUserMuted, setIsUserMuted] = useState<boolean>(true);
@@ -95,10 +92,11 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
                 console.debug('Hybrid-Plugin --- Verification Code accepted.');
                 setIsPairing(false);
                 setIsCodeVerified(true);
-                setStatus('layoutSelection');
                 setRoomConfig(data.roomConfig);
-                setAvailableLayouts(Object.values(data.roomConfig.layouts));
                 setPinValue(null);
+                setPinError(false);
+                setShowModal(false);
+                fetchJoinUrls();
             }
 
             if (data.type === 'VerificationCodeRejected') {
@@ -129,7 +127,6 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
         setIsPairing(false);
         setShowModal(false);
         setIsRoomDisconnected(false);
-        setLayoutIndex(null);
     };
 
     const handlePinCompletion = (value: string, index: number): void => {
@@ -154,30 +151,6 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
             }
         }
     }, [talkingIndicator]);
-
-    const muteCurrentUser = async () => {
-        if (apolloClient && !isUserMuted) {
-            const result = await apolloClient.mutate({
-                mutation: USER_SET_MUTED,
-                variables: {
-                    userId: currentUser.userId,
-                    muted: true,
-                },
-            });
-        }
-    };
-
-    const layoutSelection = async (index: number): Promise<void> => {
-        setStatus('applyingLayout');
-        await muteCurrentUser();
-        pluginApi.uiCommands.conference.setSpeakerLevel({ level: 0 });
-        setLayoutIndex(index);
-        console.debug('Hybrid-Plugin --- Set Layout Index to: ', index);
-        setStatus('layoutSelected');
-        setPinError(false);
-        setPinValue(null);
-        setShowModal(false);
-    };
 
     const disconnect = async (): Promise<void> => {
         pluginApi.uiCommands.conference.setSpeakerLevel({ level: 1 });
@@ -219,22 +192,16 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
         }
     }, [currentUser]);
 
-    useEffect(() => {
-        const fetchJoinUrls = async () => {
-            if (layoutIndex === null) return;
+    const fetchJoinUrls = async () => {
+        const joinUrl: string = await pluginApi.getJoinUrl({
+            "fullName": roomConfig.bbb_user_name,
+            "duplicateSession": "false"
+        });
 
-            const joinUrl: string = await pluginApi.getJoinUrl({
-                "fullName": roomConfig.bbb_user_name,
-                "duplicateSession": "false"
-            });
-
-            setRoomJoinUrls({
-                "type": "JoinURL", "joinUrl": joinUrl, "layoutIndex": layoutIndex
-            });
-        };
-
-        fetchJoinUrls();
-    }, [layoutIndex]);
+        setRoomJoinUrls({
+            "type": "JoinURL", "joinUrl": joinUrl, "layoutIndex": 0
+        });
+    };
 
     useEffect(() => {
         try {
@@ -332,75 +299,14 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
                     </>
                 ) : (
                     <>
-                        {status ? (
-                            <>
-                                {status == "accepted" && (
-                                    <>
-                                        <LoaderComponent title="Accepted, loading layouts..." />
-                                        <button
-                                            className="button-style"
-                                            type="button"
-                                            onClick={disconnect}
-                                        >
-                                            Cancel Pairing
-                                        </button>
-                                    </>
-                                )}
-
-                                {status == "layoutSelection" && (
-                                    <>
-                                        <LayoutComponent
-                                            layouts={availableLayouts}
-                                            layoutIndex={layoutSelection}
-                                        />
-                                        <button
-                                            className="button-style"
-                                            type="button"
-                                            onClick={disconnect}
-                                        >
-                                            Cancel Pairing
-                                        </button>
-                                    </>
-                                )}
-
-                                {status == "applyingLayout" && (
-                                    <>
-                                        <LoaderComponent title="Applying layout..." />
-                                        <button
-                                            className="button-style"
-                                            type="button"
-                                            onClick={disconnect}
-                                        >
-                                            Cancel Pairing
-                                        </button>
-                                    </>
-                                )}
-
-                                {status == "layoutSelected" && (
-                                    <>
-                                        <h3>Room already connected!</h3>
-                                        <button
-                                            className="button-style"
-                                            type="button"
-                                            onClick={disconnect}
-                                        >
-                                            Disconnect
-                                        </button>
-                                    </>
-                                )}
-                            </>
-                        ) : (
-                            <>
-                                <h3>Connection declined</h3>
-                                <button
-                                    className="button-style"
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                >
-                                    Close
-                                </button>
-                            </>
-                        )}
+                        <h3>Connection declined</h3>
+                        <button
+                            className="button-style"
+                            type="button"
+                            onClick={() => setShowModal(false)}
+                        >
+                            Close
+                        </button>
                     </>
                 )}
             </div>
