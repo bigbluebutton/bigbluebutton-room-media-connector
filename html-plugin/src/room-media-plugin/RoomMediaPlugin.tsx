@@ -10,11 +10,10 @@ import {
     ActionButtonDropdownSeparator,
     ActionButtonDropdownOption
 } from 'bigbluebutton-html-plugin-sdk';
-import { RoomConfig, Layout, RoomMediaPluginProps } from './types';
+import { RoomConfig, RoomMediaPluginProps } from './types';
 
 import PinComponent from './Shared/PinComponent';
 import LoaderComponent from './Shared/LoaderComponent';
-import LayoutComponent from './Shared/LayoutComponent';
 
 import { USER_SET_MUTED } from './libs/mutations';
 
@@ -31,18 +30,14 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
     };
 
     const webSocketRef = useRef<WebSocket | null>(null);
-    const [layoutIndex, setLayoutIndex] = useState<number | null>(null);
-    const [availableLayouts, setAvailableLayouts] = useState<Layout[] | null>(null);
     const [roomConfig, setRoomConfig] = useState<RoomConfig | null>(null);
-    const [isCodeVerified, setIsCodeVerified] = useState<boolean | null>(false);
+    const [isCodeVerified, setIsCodeVerified] = useState<boolean>(false);
     const [verificationCode, setVerificationCode] = useState<string | null>(null);
     const [verificationCodeRejected, setVerificationCodeRejected] = useState<boolean>(false);
-
     const [roomJoinUrls, setRoomJoinUrls] = useState(null);
     const [pinValue, setPinValue] = useState<string | null>(null);
     const [pinError, setPinError] = useState<boolean>(false);
     const [isPairing, setIsPairing] = useState<boolean>(false);
-    const [status, setStatus] = useState<string | null>(null);
     const [apolloClient, setApolloClient] = useState<any>(null);
     const { data: talkingIndicator } = pluginApi.useTalkingIndicator();
     const [isUserMuted, setIsUserMuted] = useState<boolean>(true);
@@ -93,12 +88,8 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
 
             if (data.type === 'VerificationCodeAccepted') {
                 console.debug('Hybrid-Plugin --- Verification Code accepted.');
-                setIsPairing(false);
-                setIsCodeVerified(true);
-                setStatus('layoutSelection');
                 setRoomConfig(data.roomConfig);
-                setAvailableLayouts(Object.values(data.roomConfig.layouts));
-                setPinValue(null);
+                finalizePairing();
             }
 
             if (data.type === 'VerificationCodeRejected') {
@@ -117,6 +108,7 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
         ws.onclose = (e) => {
             console.info('Hybrid-Plugin --- Room Integration Plugin: Closing WebSocket Connection', e);
             resetPlugin();
+            setShowModal(false);
         };
 
         webSocketRef.current = ws;
@@ -126,10 +118,9 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
         setPinValue(null);
         setVerificationCode(null);
         setVerificationCodeRejected(false);
+        setIsCodeVerified(false);
         setIsPairing(false);
-        setShowModal(false);
         setIsRoomDisconnected(false);
-        setLayoutIndex(null);
     };
 
     const handlePinCompletion = (value: string, index: number): void => {
@@ -156,6 +147,7 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
     }, [talkingIndicator]);
 
     const muteCurrentUser = async () => {
+        console.debug('Hybrid-Plugin --- Muting current user');
         if (apolloClient && !isUserMuted) {
             const result = await apolloClient.mutate({
                 mutation: USER_SET_MUTED,
@@ -167,16 +159,33 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
         }
     };
 
-    const layoutSelection = async (index: number): Promise<void> => {
-        setStatus('applyingLayout');
-        await muteCurrentUser();
+    useEffect(() => {
+        const fetchJoinUrls = async () => {
+            if (roomConfig) {
+                console.debug('Hybrid-Plugin --- Fetching join urls');
+                const joinUrl: string = await pluginApi.getJoinUrl({
+                    "fullName": roomConfig.bbb_user_name,
+                    "duplicateSession": "false"
+                });
+
+                setRoomJoinUrls({
+                    "type": "JoinURL", "joinUrl": joinUrl, "layoutIndex": 0
+                });
+                console.debug('Hybrid-Plugin --- Got Join URL:', joinUrl);
+            }
+        };
+
+        fetchJoinUrls();
+    }, [roomConfig]);
+
+    const finalizePairing = async () => {
         pluginApi.uiCommands.conference.setSpeakerLevel({ level: 0 });
-        setLayoutIndex(index);
-        console.debug('Hybrid-Plugin --- Set Layout Index to: ', index);
-        setStatus('layoutSelected');
         setPinError(false);
         setPinValue(null);
         setShowModal(false);
+        setIsPairing(false);
+        setIsCodeVerified(true);
+        setPinValue(null);
     };
 
     const disconnect = async (): Promise<void> => {
@@ -220,27 +229,11 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
     }, [currentUser]);
 
     useEffect(() => {
-        const fetchJoinUrls = async () => {
-            if (layoutIndex === null) return;
-
-            const joinUrl: string = await pluginApi.getJoinUrl({
-                "fullName": roomConfig.bbb_user_name,
-                "duplicateSession": "false"
-            });
-
-            setRoomJoinUrls({
-                "type": "JoinURL", "joinUrl": joinUrl, "layoutIndex": layoutIndex
-            });
-        };
-
-        fetchJoinUrls();
-    }, [layoutIndex]);
-
-    useEffect(() => {
         try {
             if (roomJoinUrls && webSocketRef.current?.readyState === WebSocket.OPEN) {
                 console.debug('Hybrid-Plugin --- Sending join urls via WebSocket:', JSON.stringify(roomJoinUrls));
                 webSocketRef.current.send(JSON.stringify(roomJoinUrls));
+                muteCurrentUser();
             }
         } catch (error) {
             console.error('Hybrid-Plugin --- Room Integration Plugin: Error sending urls via WebSocket:', error);
@@ -273,19 +266,21 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
                     width: '100%', height: '100%', alignItems: 'center', display: 'flex', flexDirection: 'column',
                 }}
             >
-
-                {verificationCodeRejected ? ( // Check for verificationCodeRejected first
+                {verificationCodeRejected ? (
                     <>
                         <h4>Verification Code Rejected by Room</h4>
                         <button
                             className="button-style"
                             type="button"
-                            onClick={resetPlugin}
+                            onClick={() => {
+                                resetPlugin();
+                                setShowModal(false);
+                            }}
                         >
                             Ok
                         </button>
                     </>
-                ) : isRoomDisconnected ? ( // Then check for isRoomDisconnected
+                ) : isRoomDisconnected ? (
                     <>
                         <h4>Room Disconnected</h4>
                         <button
@@ -332,75 +327,14 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
                     </>
                 ) : (
                     <>
-                        {status ? (
-                            <>
-                                {status == "accepted" && (
-                                    <>
-                                        <LoaderComponent title="Accepted, loading layouts..." />
-                                        <button
-                                            className="button-style"
-                                            type="button"
-                                            onClick={disconnect}
-                                        >
-                                            Cancel Pairing
-                                        </button>
-                                    </>
-                                )}
-
-                                {status == "layoutSelection" && (
-                                    <>
-                                        <LayoutComponent
-                                            layouts={availableLayouts}
-                                            layoutIndex={layoutSelection}
-                                        />
-                                        <button
-                                            className="button-style"
-                                            type="button"
-                                            onClick={disconnect}
-                                        >
-                                            Cancel Pairing
-                                        </button>
-                                    </>
-                                )}
-
-                                {status == "applyingLayout" && (
-                                    <>
-                                        <LoaderComponent title="Applying layout..." />
-                                        <button
-                                            className="button-style"
-                                            type="button"
-                                            onClick={disconnect}
-                                        >
-                                            Cancel Pairing
-                                        </button>
-                                    </>
-                                )}
-
-                                {status == "layoutSelected" && (
-                                    <>
-                                        <h3>Room already connected!</h3>
-                                        <button
-                                            className="button-style"
-                                            type="button"
-                                            onClick={disconnect}
-                                        >
-                                            Disconnect
-                                        </button>
-                                    </>
-                                )}
-                            </>
-                        ) : (
-                            <>
-                                <h3>Connection declined</h3>
-                                <button
-                                    className="button-style"
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                >
-                                    Close
-                                </button>
-                            </>
-                        )}
+                        <h3>Room "{roomConfig?.bbb_user_name}" is connected!</h3>
+                        <button
+                            className="button-style"
+                            type="button"
+                            onClick={disconnect}
+                        >
+                            Disconnect
+                        </button>
                     </>
                 )}
             </div>
