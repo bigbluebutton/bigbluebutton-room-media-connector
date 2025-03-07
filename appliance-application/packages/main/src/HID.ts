@@ -15,4 +15,7 @@ export interface HIDActions {
   leave: () => void;
   mute: () => void;
   unmute: () => void;
+  layout1: () => void;
+  layout2: () => void;
+  layout3: () => void;
 }

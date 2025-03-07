@@ -4,87 +4,31 @@ import {gql} from '@apollo/client/core';
 import {BBBGraphQl} from './BBBGraphQl';
 import type {DisplayManager} from './displayManager';
 import type {Layout} from '../../common/config';
-import { v7 as uuid } from 'uuid';
-/*
-export async function createBBBMeeting(control: string, screens: Array<string>, displayManager: DisplayManager, leftCallback: () => void) {
+import {v7 as uuid} from 'uuid';
 
-  const bbbGraphQl = new BBBGraphql(control);
-  const connected = await bbbGraphQl.connect();
-  if(!connected)
-    return false;
-
-  console.log('connected to graphql');
-
-  const joinUrl1 = await bbbGraphQl.getJoinURL({
-    'sessionName': 'left',
-    'enforceLayout': 'CAMERAS_ONLY',
-    'userdata-bbb_hide_actions_bar': false,
-    'userdata-bbb_display_notifications': false,
-    'userdata-bbb_auto_share_webcam': true,
-    'userdata-bbb_listen_only_mode': false,
-    'userdata-bbb_skip_check_audio': true,
-    'userdata-bbb_skip_video_preview': true,
-    'userdata-bbb_preferred_camera_profile': 'high',
-    'userdata-bbb_hide_nav_bar': true,
-    'userdata-bbb_auto_join_audio': true,
-    'userdata-bbb_show_session_details_on_join': false,
-  });
-
-  console.log('joinUrl1', joinUrl1.status);
-  console.log('joinUrl1', joinUrl1.statusText);
-  console.log('joinUrl1', JSON.stringify(joinUrl1.data));
-  console.log('joinUrl1', JSON.stringify(joinUrl1.headers));
-  console.log('joinUrl1', JSON.stringify(joinUrl1.config));
-
-  const joinUrl2 = await bbbGraphQl.getJoinURL({
-    'sessionName': 'right',
-    'enforceLayout': 'PRESENTATION_ONLY',
-    'userdata-bbb_hide_actions_bar': false,
-    'userdata-bbb_display_notifications': false,
-    'userdata-bbb_auto_share_webcam': true,
-    'userdata-bbb_listen_only_mode': false,
-    'userdata-bbb_skip_check_audio': true,
-    'userdata-bbb_skip_video_preview': true,
-    'userdata-bbb_preferred_camera_profile': 'high',
-    'userdata-bbb_hide_nav_bar': true,
-    'userdata-bbb_auto_join_audio': true,
-    'userdata-bbb_show_session_details_on_join': false,
-  });
-
-  console.log('joinUrl2', joinUrl2.status);
-  console.log('joinUrl2', joinUrl2.statusText);
-  console.log('joinUrl2', JSON.stringify(joinUrl2.data));
-  console.log('joinUrl2', JSON.stringify(joinUrl2.headers));
-  console.log('joinUrl2', JSON.stringify(joinUrl2.config));
-
-  return new BBBMeeting(screens, displayManager, leftCallback, bbbGraphQl);
-}
-*/
 export async function createBBBMeeting(control: string, displayManager: DisplayManager, leftCallback: () => void) {
 
   const bbbGraphQl = new BBBGraphQl(control);
   const connected = await bbbGraphQl.connect(leftCallback);
-  if(!connected)
-    return false;
+  if (!connected) return false;
 
   console.log('connected to graphql');
 
   return new BBBMeeting(displayManager, leftCallback, bbbGraphQl);
 }
 
-
 class BBBMeeting {
-  private screens: {[key: string]: string};
+  private screens!: {[key: string]: string};
   private displayManager: DisplayManager;
 
-  private windows: BrowserWindow[];
-  private apolloClient: ApolloClient<NormalizedCacheObject>;
+  private windows: {[key: string]: BrowserWindow};
+  private apolloClient: ApolloClient<NormalizedCacheObject> | undefined;
   private bbbGraphQl: BBBGraphQl;
-  private mediaScreen: {url: string, window: BrowserWindow};
+  private mediaScreen: {url: string; window: BrowserWindow} | undefined;
 
   constructor(displayManager: DisplayManager, leftCallback: () => void, bbbGraphQl: BBBGraphQl) {
     this.displayManager = displayManager;
-    this.windows = [];
+    this.windows = {};
     this.bbbGraphQl = bbbGraphQl;
 
     this.apolloClient = this.bbbGraphQl.getApolloClient();
@@ -97,7 +41,6 @@ class BBBMeeting {
   }
 
   private onUsersLeft(callback: () => void) {
-
     const getMeetingEndData = gql`
       subscription getUserCurrent {
         user_current {
@@ -112,7 +55,12 @@ class BBBMeeting {
           }
         }
       }
-     `;
+    `;
+
+    if (this.apolloClient == undefined) {
+      console.error('Error: apolloClient is undefined');
+      return;
+    }
 
     this.apolloClient
       .subscribe({
@@ -121,7 +69,7 @@ class BBBMeeting {
       .subscribe({
         next(data) {
           console.log('getMeetingEndData', JSON.stringify(data));
-          if(data.data.user_current[0].meeting.ended === true){
+          if (data.data.user_current[0].meeting.ended === true) {
             console.log('Meeting ended');
             callback();
           }
@@ -130,7 +78,6 @@ class BBBMeeting {
           console.error('err meeting ended', err);
         },
       });
-
 
     const USER_SESSIONS = gql`
       subscription {
@@ -167,30 +114,33 @@ class BBBMeeting {
   }
 
   public async openScreens(layout: Layout) {
-    console.log('layout', layout.label);
+    
+    console.log('Switching Layout to: ', layout.label);    
+
+    // if (this.windows.length > 0) {
+    //   console.log('Windows already exist. Amount of Current windows: ' + this.windows.length);      
+    //   for (var window of this.windows) {
+    //     console.log('Closing window: ' + window.id);
+    //     window.close();
+    //     window.destroy();
+    //   }
+    // }
 
     this.mediaScreen = undefined;
-
     this.screens = {};
-    for (const [key, value] of Object.entries(layout.screens)) {
-      console.log(key, value);
 
+    for (const [key, value] of Object.entries(layout.screens)) {      
+      console.log("\nProcessing screen: " + key);
+      console.log("With value: " + value + "\n");
       const joinUrl = await this.bbbGraphQl.getJoinURL({
         sessionName: key,
         duplicateSession: false,
         ...value.bbb_join_parameters,
       });
-
-      console.log('status', joinUrl.status);
-      console.log('statusText', joinUrl.statusText);
-      console.log('data', JSON.stringify(joinUrl.data));
-      console.log('headers', JSON.stringify(joinUrl.headers));
-      console.log('config', JSON.stringify(joinUrl.config));
-
       this.screens[key] = joinUrl.data.response.url;
     }
 
-    const newWindows = [];
+    let newWindows: {[key: string]: BrowserWindow} = {};    
 
     for (const [screen, url] of Object.entries(this.screens)) {
       const screenDisplay = this.displayManager.getDisplay(screen);
@@ -200,13 +150,16 @@ class BBBMeeting {
         continue;
       }
 
-      console.log('screenDisplay', screenDisplay);
+      console.log('Processing screen ' + screen);
 
       const partition = 'persist:windows-' + uuid();
 
       // Get old window if exists
-      let screenWindow = this.windows.shift();
-      if(screenWindow == undefined) {
+      let screenWindow = this.windows[screenDisplay.label];
+      delete this.windows[screenDisplay.label];
+
+      if (screenWindow == undefined) {
+        console.log('Creating new window');
         screenWindow = new BrowserWindow({
           show: true,
           width: screenDisplay.size.width,
@@ -219,37 +172,50 @@ class BBBMeeting {
             contextIsolation: true,
           },
         });
+        console.log('Creating new window');        
+        await screenWindow.loadURL(url);
+      } else {
+        // When leaving the BBB meeting (by visiting another website), BBB will show a confirmation dialog (are you sure blabla)
+        // This dialog will prevent the loading of a new URL, so we handle this problem here in this event listener
+        screenWindow.webContents.on('will-prevent-unload', (event) => {
+          console.log("Prevented unload detected, forcing unload...");
+          event.preventDefault(); // This stops the confirmation dialog
+          if(screenWindow) {
+            console.log("Loading URL again for window: " + screenDisplay.label);
+            console.log("Using URL: " + url);
+            screenWindow.loadURL(url);
+          }
+        });
+        await screenWindow.loadURL(url);
       }
-      await screenWindow.loadURL(url);
 
-      newWindows.push(screenWindow);
+      newWindows[screenDisplay.label] = screenWindow;
 
       if (url.includes('userdata-bbb_auto_join_audio=true')) {
         this.mediaScreen = {url: url, window: screenWindow};
       }
-
-
     }
 
     // Close all unused windows
-    this.windows.forEach(window => {
+    Object.values(this.windows).forEach(window => {
+      console.log('closing window ' + window.id);
       window.close();
       window.destroy();
     });
 
     this.windows = newWindows;
-
-
-
-
   }
 
   public mute() {
-    this.executeJavaScriptInMediaScreen('document.querySelectorAll(\'button[data-test="muteMicButton"]\')[0].click()').then(r => console.log(r));
+    this.executeJavaScriptInMediaScreen(
+      'document.querySelectorAll(\'button[data-test="muteMicButton"]\')[0].click()',
+    ).then(r => console.log(r));
   }
 
   public unmute() {
-    this.executeJavaScriptInMediaScreen('document.querySelectorAll(\'button[data-test="unmuteMicButton"]\')[0].click()').then(r => console.log(r));
+    this.executeJavaScriptInMediaScreen(
+      'document.querySelectorAll(\'button[data-test="unmuteMicButton"]\')[0].click()',
+    ).then(r => console.log(r));
   }
 
   public async getMediaDevices() {
@@ -273,13 +239,13 @@ class BBBMeeting {
   }
 
   private async executeJavaScriptInMediaScreen(command: string) {
-    if(this.mediaScreen) {
+    if (this.mediaScreen) {
       return await this.mediaScreen.window.webContents.executeJavaScript(command);
     }
   }
 
   private closeScreens() {
-    this.windows.forEach(window => {
+    Object.values(this.windows).forEach(window => {
       window.close();
       window.destroy();
     });

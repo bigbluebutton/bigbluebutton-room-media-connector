@@ -1,6 +1,6 @@
-import {app, BrowserWindow, ipcMain } from 'electron';
+import {app, BrowserWindow, ipcMain} from 'electron';
 import {join, resolve} from 'node:path';
-import { createBBBMeeting } from './BBBMeeting';
+import {createBBBMeeting} from './BBBMeeting';
 import {fileURLToPath} from 'url';
 import path from 'path';
 import {config, configPath, displayManager, hdiDevices} from './index';
@@ -32,8 +32,7 @@ async function createWindow() {
     },
   });
 
-  if(config.debug)
-    browserWindow.webContents.openDevTools();
+  if (config.debug) browserWindow.webContents.openDevTools();
 
   // RPC from the UI to get the settings
   ipcMain.handle('getConfig', () => {
@@ -105,19 +104,19 @@ async function createWindow() {
     // Open the screens with the BBB HTML5 Clients
     await bbbMeeting.openScreens(layout);
 
-    const otherLayout = config.room.layouts[2];
-    // wait 20 sec before opening the other layout
-    setTimeout(async () => {
-      await bbbMeeting.openScreens(otherLayout);
-    }, 20*1000);
+    //const otherLayout = config.room.layouts[2];
+    //wait 20 sec before opening the other layout
+    // setTimeout(async () => {
+    //   await bbbMeeting.openScreens(otherLayout);
+    // }, 20 * 1000);
 
     console.log('joined');
 
     // Wait 5 sec before unmuting the audio
     setTimeout(() => {
-        bbbMeeting.unmute();
-        //bbbMeeting.getMediaDevices();
-      }, 5000);
+      bbbMeeting.unmute();
+      //bbbMeeting.getMediaDevices();
+    }, 5000);
 
     ipcMain.on('pluginDisconnected', pluginDisconnected);
 
@@ -137,6 +136,10 @@ async function createWindow() {
       ipcMain.off('pluginDisconnected', pluginDisconnected);
     };
 
+    // Log the room layouts
+    console.log('room layout 1:', config.room.layouts[0].label);
+    console.log('room layout 2:', config.room.layouts[1].label);
+    console.log('room layout 3:', config.room.layouts[2].label);
 
     // Notify all connected HDI devices that the user has joined the meeting
     hdiDevices.forEach(device => {
@@ -147,6 +150,15 @@ async function createWindow() {
         },
         unmute: () => {
           bbbMeeting.unmute();
+        },
+        layout1: () => {
+          bbbMeeting.openScreens(config.room.layouts[0]);
+        },
+        layout2: () => {
+          bbbMeeting.openScreens(config.room.layouts[1]);
+        },
+        layout3: () => {
+          bbbMeeting.openScreens(config.room.layouts[2]);
         },
       });
     });
@@ -214,7 +226,7 @@ async function createWindow() {
 function getPINScreen() {
   // Get display for the pin screen
   const pinDisplayLabel = config.preferred_pin_screen;
-  if(pinDisplayLabel === undefined) {
+  if (pinDisplayLabel === undefined) {
     console.error('Preferred pin screen is not set in the config file');
   }
 
@@ -222,10 +234,11 @@ function getPINScreen() {
 
   const pinDisplay = preferredPinDisplay || displayManager.getDisplays()[0];
 
-  if(preferredPinDisplay === null) {
-    console.error(`Preferred pin screen '${pinDisplayLabel}' not found. Falling back to the display '${pinDisplay.label}'`);
-  }
-  else {
+  if (preferredPinDisplay === null) {
+    console.error(
+      `Preferred pin screen '${pinDisplayLabel}' not found. Falling back to the display '${pinDisplay.label}'`,
+    );
+  } else {
     console.log(`Pin screen set to '${pinDisplayLabel}'`);
   }
 
