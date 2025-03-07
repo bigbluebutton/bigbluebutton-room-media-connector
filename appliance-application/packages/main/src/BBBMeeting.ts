@@ -171,23 +171,24 @@ class BBBMeeting {
             partition: partition,
             contextIsolation: true,
           },
-        });
-        console.log('Creating new window');        
-        await screenWindow.loadURL(url);
+        });        
       } else {
-        // When leaving the BBB meeting (by visiting another website), BBB will show a confirmation dialog (are you sure blabla)
-        // This dialog will prevent the loading of a new URL, so we handle this problem here in this event listener
-        screenWindow.webContents.on('will-prevent-unload', (event) => {
-          console.log("Prevented unload detected, forcing unload...");
-          event.preventDefault(); // This stops the confirmation dialog
-          if(screenWindow) {
-            console.log("Loading URL again for window: " + screenDisplay.label);
-            console.log("Using URL: " + url);
-            screenWindow.loadURL(url);
-          }
-        });
-        await screenWindow.loadURL(url);
+        console.log('Using existing window');
       }
+
+      // When leaving the BBB meeting (by visiting another website), BBB will show a confirmation dialog (are you sure blabla)
+      // This dialog will prevent the loading of a new URL, so we handle this problem here in this event listener
+      screenWindow.webContents.on('will-prevent-unload', (event) => {
+        console.log("Prevented unload detected, forcing unload...");
+        event.preventDefault(); // This stops the confirmation dialog
+        if(screenWindow) {
+          console.log(screenDisplay.label + ": Loading URL again: " + url);          
+          screenWindow.loadURL(url);
+        }
+      });
+      console.log('\n' + screenDisplay.label + ': Loading URL: ' + url);      
+      await screenWindow.loadURL(url);
+      console.log(screenDisplay.label + ': Loading of URL finished.\n');
 
       newWindows[screenDisplay.label] = screenWindow;
 

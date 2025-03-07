@@ -4,6 +4,7 @@ import {createBBBMeeting} from './BBBMeeting';
 import {fileURLToPath} from 'url';
 import path from 'path';
 import {config, configPath, displayManager, hdiDevices} from './index';
+import {StreamDeckHID} from './streamdeck';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -113,10 +114,10 @@ async function createWindow() {
     console.log('joined');
 
     // Wait 5 sec before unmuting the audio
-    setTimeout(() => {
-      bbbMeeting.unmute();
-      //bbbMeeting.getMediaDevices();
-    }, 5000);
+    // setTimeout(() => {
+    //   bbbMeeting.unmute();
+    //   //bbbMeeting.getMediaDevices();
+    // }, 10000);
 
     ipcMain.on('pluginDisconnected', pluginDisconnected);
 
@@ -152,13 +153,19 @@ async function createWindow() {
           bbbMeeting.unmute();
         },
         layout1: () => {
+          console.log('Layout 1 selected via HDI device');
           bbbMeeting.openScreens(config.room.layouts[0]);
+          if (device instanceof StreamDeckHID) device.selectLayout(0); // TODO: make this more nice
         },
         layout2: () => {
+          console.log('Layout 2 selected via HDI device');
           bbbMeeting.openScreens(config.room.layouts[1]);
+          if (device instanceof StreamDeckHID) device.selectLayout(1);
         },
         layout3: () => {
+          console.log('Layout 3 selected via HDI device');
           bbbMeeting.openScreens(config.room.layouts[2]);
+          if (device instanceof StreamDeckHID) device.selectLayout(2);
         },
       });
     });
