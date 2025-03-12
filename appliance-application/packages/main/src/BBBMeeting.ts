@@ -114,11 +114,11 @@ class BBBMeeting {
   }
 
   public async openScreens(layout: Layout) {
-    
-    console.log('Switching Layout to: ', layout.label);    
+
+    console.log('Switching Layout to: ', layout.label);
 
     // if (this.windows.length > 0) {
-    //   console.log('Windows already exist. Amount of Current windows: ' + this.windows.length);      
+    //   console.log('Windows already exist. Amount of Current windows: ' + this.windows.length);
     //   for (var window of this.windows) {
     //     console.log('Closing window: ' + window.id);
     //     window.close();
@@ -129,7 +129,7 @@ class BBBMeeting {
     this.mediaScreen = undefined;
     this.screens = {};
 
-    for (const [key, value] of Object.entries(layout.screens)) {      
+    for (const [key, value] of Object.entries(layout.screens)) {
       console.log("\nProcessing screen: " + key);
       console.log("With value: " + value + "\n");
       const joinUrl = await this.bbbGraphQl.getJoinURL({
@@ -140,7 +140,7 @@ class BBBMeeting {
       this.screens[key] = joinUrl.data.response.url;
     }
 
-    let newWindows: {[key: string]: BrowserWindow} = {};    
+    let newWindows: {[key: string]: BrowserWindow} = {};
 
     for (const [screen, url] of Object.entries(this.screens)) {
       const screenDisplay = this.displayManager.getDisplay(screen);
@@ -171,7 +171,8 @@ class BBBMeeting {
             partition: partition,
             contextIsolation: true,
           },
-        });        
+          autoHideMenuBar: true,
+        });
       } else {
         console.log('Using existing window');
       }
@@ -182,11 +183,11 @@ class BBBMeeting {
         console.log("Prevented unload detected, forcing unload...");
         event.preventDefault(); // This stops the confirmation dialog
         if(screenWindow) {
-          console.log(screenDisplay.label + ": Loading URL again: " + url);          
+          console.log(screenDisplay.label + ": Loading URL again: " + url);
           screenWindow.loadURL(url);
         }
       });
-      console.log('\n' + screenDisplay.label + ': Loading URL: ' + url);      
+      console.log('\n' + screenDisplay.label + ': Loading URL: ' + url);
       await screenWindow.loadURL(url);
       console.log(screenDisplay.label + ': Loading of URL finished.\n');
 
