@@ -4,108 +4,31 @@ import {gql} from '@apollo/client/core';
 import {BBBGraphQl} from './BBBGraphQl';
 import type {DisplayManager} from './displayManager';
 import type {Layout} from '../../common/config';
-/*
-export async function createBBBMeeting(control: string, screens: Array<string>, displayManager: DisplayManager, leftCallback: () => void) {
+import {v7 as uuid} from 'uuid';
 
-  const bbbGraphQl = new BBBGraphql(control);
-  const connected = await bbbGraphQl.connect();
-  if(!connected)
-    return false;
-
-  console.log('connected to graphql');
-
-  const joinUrl1 = await bbbGraphQl.getJoinURL({
-    'sessionName': 'left',
-    'enforceLayout': 'CAMERAS_ONLY',
-    'userdata-bbb_hide_actions_bar': false,
-    'userdata-bbb_display_notifications': false,
-    'userdata-bbb_auto_share_webcam': true,
-    'userdata-bbb_listen_only_mode': false,
-    'userdata-bbb_skip_check_audio': true,
-    'userdata-bbb_skip_video_preview': true,
-    'userdata-bbb_preferred_camera_profile': 'high',
-    'userdata-bbb_hide_nav_bar': true,
-    'userdata-bbb_auto_join_audio': true,
-    'userdata-bbb_show_session_details_on_join': false,
-  });
-
-  console.log('joinUrl1', joinUrl1.status);
-  console.log('joinUrl1', joinUrl1.statusText);
-  console.log('joinUrl1', JSON.stringify(joinUrl1.data));
-  console.log('joinUrl1', JSON.stringify(joinUrl1.headers));
-  console.log('joinUrl1', JSON.stringify(joinUrl1.config));
-
-  const joinUrl2 = await bbbGraphQl.getJoinURL({
-    'sessionName': 'right',
-    'enforceLayout': 'PRESENTATION_ONLY',
-    'userdata-bbb_hide_actions_bar': false,
-    'userdata-bbb_display_notifications': false,
-    'userdata-bbb_auto_share_webcam': true,
-    'userdata-bbb_listen_only_mode': false,
-    'userdata-bbb_skip_check_audio': true,
-    'userdata-bbb_skip_video_preview': true,
-    'userdata-bbb_preferred_camera_profile': 'high',
-    'userdata-bbb_hide_nav_bar': true,
-    'userdata-bbb_auto_join_audio': true,
-    'userdata-bbb_show_session_details_on_join': false,
-  });
-
-  console.log('joinUrl2', joinUrl2.status);
-  console.log('joinUrl2', joinUrl2.statusText);
-  console.log('joinUrl2', JSON.stringify(joinUrl2.data));
-  console.log('joinUrl2', JSON.stringify(joinUrl2.headers));
-  console.log('joinUrl2', JSON.stringify(joinUrl2.config));
-
-  return new BBBMeeting(screens, displayManager, leftCallback, bbbGraphQl);
-}
-*/
-export async function createBBBMeeting(control: string, layout: Layout, displayManager: DisplayManager, leftCallback: () => void) {
+export async function createBBBMeeting(control: string, displayManager: DisplayManager, leftCallback: () => void) {
 
   const bbbGraphQl = new BBBGraphQl(control);
   const connected = await bbbGraphQl.connect(leftCallback);
-  if(!connected)
-    return false;
+  if (!connected) return false;
 
   console.log('connected to graphql');
 
-  console.log('layout', layout.label);
-
-  const screens: {[key: string]: string} = {};
-  for (const [key, value] of Object.entries(layout.screens)) {
-    console.log(key, value);
-
-    const joinUrl = await bbbGraphQl.getJoinURL({
-      sessionName: key,
-      duplicateSession: false,
-      ...value.bbb_join_parameters,
-    });
-
-    console.log('status', joinUrl.status);
-    console.log('statusText', joinUrl.statusText);
-    console.log('data', JSON.stringify(joinUrl.data));
-    console.log('headers', JSON.stringify(joinUrl.headers));
-    console.log('config', JSON.stringify(joinUrl.config));
-
-    screens[key] = joinUrl.data.response.url;
-  }
-
-  return new BBBMeeting(screens, displayManager, leftCallback, bbbGraphQl);
+  return new BBBMeeting(displayManager, leftCallback, bbbGraphQl);
 }
 
-
 class BBBMeeting {
-  private readonly screens: {[key: string]: string};
+  private screens!: {[key: string]: string};
   private displayManager: DisplayManager;
 
-  private windows: BrowserWindow[];
-  private apolloClient: ApolloClient<NormalizedCacheObject>;
+  private windows: {[key: string]: BrowserWindow};
+  private apolloClient: ApolloClient<NormalizedCacheObject> | undefined;
   private bbbGraphQl: BBBGraphQl;
-  private mediaScreen: {url: string, window: BrowserWindow};
+  private mediaScreen: {url: string; window: BrowserWindow} | undefined;
 
-  constructor(screens: {[key: string]: string}, displayManager: DisplayManager, leftCallback: () => void, bbbGraphQl: BBBGraphQl) {
-    this.screens = screens;
+  constructor(displayManager: DisplayManager, leftCallback: () => void, bbbGraphQl: BBBGraphQl) {
     this.displayManager = displayManager;
-    this.windows = [];
+    this.windows = {};
     this.bbbGraphQl = bbbGraphQl;
 
     this.apolloClient = this.bbbGraphQl.getApolloClient();
@@ -118,7 +41,6 @@ class BBBMeeting {
   }
 
   private onUsersLeft(callback: () => void) {
-
     const getMeetingEndData = gql`
       subscription getUserCurrent {
         user_current {
@@ -133,7 +55,12 @@ class BBBMeeting {
           }
         }
       }
-     `;
+    `;
+
+    if (this.apolloClient == undefined) {
+      console.error('Error: apolloClient is undefined');
+      return;
+    }
 
     this.apolloClient
       .subscribe({
@@ -142,7 +69,7 @@ class BBBMeeting {
       .subscribe({
         next(data) {
           console.log('getMeetingEndData', JSON.stringify(data));
-          if(data.data.user_current[0].meeting.ended === true){
+          if (data.data.user_current[0].meeting.ended === true) {
             console.log('Meeting ended');
             callback();
           }
@@ -151,7 +78,6 @@ class BBBMeeting {
           console.error('err meeting ended', err);
         },
       });
-
 
     const USER_SESSIONS = gql`
       subscription {
@@ -187,7 +113,35 @@ class BBBMeeting {
       });
   }
 
-  public openScreens() {
+  public async openScreens(layout: Layout) {
+
+    console.log('Switching Layout to: ', layout.label);
+
+    // if (this.windows.length > 0) {
+    //   console.log('Windows already exist. Amount of Current windows: ' + this.windows.length);
+    //   for (var window of this.windows) {
+    //     console.log('Closing window: ' + window.id);
+    //     window.close();
+    //     window.destroy();
+    //   }
+    // }
+
+    this.mediaScreen = undefined;
+    this.screens = {};
+
+    for (const [key, value] of Object.entries(layout.screens)) {
+      console.log("\nProcessing screen: " + key);
+      console.log("With value: " + value + "\n");
+      const joinUrl = await this.bbbGraphQl.getJoinURL({
+        sessionName: key,
+        duplicateSession: false,
+        ...value.bbb_join_parameters,
+      });
+      this.screens[key] = joinUrl.data.response.url;
+    }
+
+    let newWindows: {[key: string]: BrowserWindow} = {};
+
     for (const [screen, url] of Object.entries(this.screens)) {
       const screenDisplay = this.displayManager.getDisplay(screen);
 
@@ -196,40 +150,74 @@ class BBBMeeting {
         continue;
       }
 
-      console.log('screenDisplay', screenDisplay);
+      console.log('Processing screen ' + screen);
 
-      const partition = 'persist:windows-' + this.windows.length;
+      const partition = 'persist:windows-' + uuid();
 
-      const screenWindow = new BrowserWindow({
-        show: true,
-        width: screenDisplay.size.width,
-        height: screenDisplay.size.height,
-        x: screenDisplay.bounds.x,
-        y: screenDisplay.bounds.y,
-        fullscreen: true,
-        webPreferences: {
-          partition: partition,
-          contextIsolation: true,
-        },
+      // Get old window if exists
+      let screenWindow = this.windows[screenDisplay.label];
+      delete this.windows[screenDisplay.label];
+
+      if (screenWindow == undefined) {
+        console.log('Creating new window');
+        screenWindow = new BrowserWindow({
+          show: true,
+          width: screenDisplay.size.width,
+          height: screenDisplay.size.height,
+          x: screenDisplay.bounds.x,
+          y: screenDisplay.bounds.y,
+          fullscreen: true,
+          webPreferences: {
+            partition: partition,
+            contextIsolation: true,
+          },
+          autoHideMenuBar: true,
+        });
+      } else {
+        console.log('Using existing window');
+      }
+
+      // When leaving the BBB meeting (by visiting another website), BBB will show a confirmation dialog (are you sure blabla)
+      // This dialog will prevent the loading of a new URL, so we handle this problem here in this event listener
+      screenWindow.webContents.on('will-prevent-unload', (event) => {
+        console.log("Prevented unload detected, forcing unload...");
+        event.preventDefault(); // This stops the confirmation dialog
+        if(screenWindow) {
+          console.log(screenDisplay.label + ": Loading URL again: " + url);
+          screenWindow.loadURL(url);
+        }
       });
-      //screenWindow.webContents.openDevTools();
+      console.log('\n' + screenDisplay.label + ': Loading URL: ' + url);
+      await screenWindow.loadURL(url);
+      console.log(screenDisplay.label + ': Loading of URL finished.\n');
 
-      this.windows.push(screenWindow);
+      newWindows[screenDisplay.label] = screenWindow;
 
-      screenWindow.loadURL(url);
-
-      if(url.includes('userdata-bbb_auto_join_audio=true')) {
+      if (url.includes('userdata-bbb_auto_join_audio=true')) {
         this.mediaScreen = {url: url, window: screenWindow};
       }
     }
+
+    // Close all unused windows
+    Object.values(this.windows).forEach(window => {
+      console.log('closing window ' + window.id);
+      window.close();
+      window.destroy();
+    });
+
+    this.windows = newWindows;
   }
 
   public mute() {
-    this.executeJavaScriptInMediaScreen('document.querySelectorAll(\'button[data-test="muteMicButton"]\')[0].click()').then(r => console.log(r));
+    this.executeJavaScriptInMediaScreen(
+      'document.querySelectorAll(\'button[data-test="muteMicButton"]\')[0].click()',
+    ).then(r => console.log(r));
   }
 
   public unmute() {
-    this.executeJavaScriptInMediaScreen('document.querySelectorAll(\'button[data-test="unmuteMicButton"]\')[0].click()').then(r => console.log(r));
+    this.executeJavaScriptInMediaScreen(
+      'document.querySelectorAll(\'button[data-test="unmuteMicButton"]\')[0].click()',
+    ).then(r => console.log(r));
   }
 
   public async getMediaDevices() {
@@ -253,13 +241,13 @@ class BBBMeeting {
   }
 
   private async executeJavaScriptInMediaScreen(command: string) {
-    if(this.mediaScreen.window) {
+    if (this.mediaScreen) {
       return await this.mediaScreen.window.webContents.executeJavaScript(command);
     }
   }
 
   private closeScreens() {
-    this.windows.forEach(window => {
+    Object.values(this.windows).forEach(window => {
       window.close();
       window.destroy();
     });

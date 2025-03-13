@@ -1,9 +1,10 @@
-import {app, BrowserWindow, ipcMain } from 'electron';
+import {app, BrowserWindow, ipcMain} from 'electron';
 import {join, resolve} from 'node:path';
-import { createBBBMeeting } from './BBBMeeting';
+import {createBBBMeeting} from './BBBMeeting';
 import {fileURLToPath} from 'url';
 import path from 'path';
 import {config, configPath, displayManager, hdiDevices} from './index';
+import {StreamDeckHID} from './streamdeck';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,10 +31,10 @@ async function createWindow() {
       webviewTag: false, // The webview tag is not recommended. Consider alternatives like an iframe or Electron's BrowserView. @see https://www.electronjs.org/docs/latest/api/webview-tag#warning
       preload: join(app.getAppPath(), 'packages/preload/dist/index.cjs'),
     },
+    autoHideMenuBar: true,
   });
 
-  if(config.debug)
-    browserWindow.webContents.openDevTools();
+  if (config.debug) browserWindow.webContents.openDevTools();
 
   // RPC from the UI to get the settings
   ipcMain.handle('getConfig', () => {
@@ -83,7 +84,7 @@ async function createWindow() {
     // Get selected layout
     const layout = config.room.layouts[layoutIndex];
 
-    const bbbMeeting = await createBBBMeeting(joinUrl, layout, displayManager, leftCallback);
+    const bbbMeeting = await createBBBMeeting(joinUrl, displayManager, leftCallback);
 
     if (bbbMeeting === false) {
       console.log('failed to join');
@@ -103,15 +104,21 @@ async function createWindow() {
     };
 
     // Open the screens with the BBB HTML5 Clients
-    bbbMeeting.openScreens();
+    await bbbMeeting.openScreens(layout);
+
+    //const otherLayout = config.room.layouts[2];
+    //wait 20 sec before opening the other layout
+    // setTimeout(async () => {
+    //   await bbbMeeting.openScreens(otherLayout);
+    // }, 20 * 1000);
 
     console.log('joined');
 
     // Wait 5 sec before unmuting the audio
-    setTimeout(() => {
-        bbbMeeting.unmute();
-        //bbbMeeting.getMediaDevices();
-      }, 5000);
+    // setTimeout(() => {
+    //   bbbMeeting.unmute();
+    //   //bbbMeeting.getMediaDevices();
+    // }, 10000);
 
     ipcMain.on('pluginDisconnected', pluginDisconnected);
 
@@ -131,6 +138,10 @@ async function createWindow() {
       ipcMain.off('pluginDisconnected', pluginDisconnected);
     };
 
+    // Log the room layouts
+    console.log('room layout 1:', config.room.layouts[0].label);
+    console.log('room layout 2:', config.room.layouts[1].label);
+    console.log('room layout 3:', config.room.layouts[2].label);
 
     // Notify all connected HDI devices that the user has joined the meeting
     hdiDevices.forEach(device => {
@@ -141,6 +152,21 @@ async function createWindow() {
         },
         unmute: () => {
           bbbMeeting.unmute();
+        },
+        layout1: () => {
+          console.log('Layout 1 selected via HDI device');
+          bbbMeeting.openScreens(config.room.layouts[0]);
+          if (device instanceof StreamDeckHID) device.selectLayout(0); // TODO: make this more nice
+        },
+        layout2: () => {
+          console.log('Layout 2 selected via HDI device');
+          bbbMeeting.openScreens(config.room.layouts[1]);
+          if (device instanceof StreamDeckHID) device.selectLayout(1);
+        },
+        layout3: () => {
+          console.log('Layout 3 selected via HDI device');
+          bbbMeeting.openScreens(config.room.layouts[2]);
+          if (device instanceof StreamDeckHID) device.selectLayout(2);
         },
       });
     });
@@ -208,7 +234,7 @@ async function createWindow() {
 function getPINScreen() {
   // Get display for the pin screen
   const pinDisplayLabel = config.preferred_pin_screen;
-  if(pinDisplayLabel === undefined) {
+  if (pinDisplayLabel === undefined) {
     console.error('Preferred pin screen is not set in the config file');
   }
 
@@ -216,10 +242,11 @@ function getPINScreen() {
 
   const pinDisplay = preferredPinDisplay || displayManager.getDisplays()[0];
 
-  if(preferredPinDisplay === null) {
-    console.error(`Preferred pin screen '${pinDisplayLabel}' not found. Falling back to the display '${pinDisplay.label}'`);
-  }
-  else {
+  if (preferredPinDisplay === null) {
+    console.error(
+      `Preferred pin screen '${pinDisplayLabel}' not found. Falling back to the display '${pinDisplay.label}'`,
+    );
+  } else {
     console.log(`Pin screen set to '${pinDisplayLabel}'`);
   }
 
