@@ -10,6 +10,6 @@
     "types": ["node"],
     "baseUrl": "."
   },
-  "include": ["src/**/*.ts", "../../types/**/*.d.ts"],
+  "include": ["src/**/*.ts", "../../types/**/*.d.ts", "../common/**/*.ts"],
   "exclude": ["**/*.spec.ts", "**/*.test.ts"]
 }

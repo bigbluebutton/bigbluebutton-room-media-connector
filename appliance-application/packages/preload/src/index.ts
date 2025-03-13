@@ -1,11 +1,20 @@
-import {contextBridge, ipcRenderer } from 'electron';
+import {contextBridge, ipcRenderer} from 'electron';
+import type {ipcAPI} from '../../common/ipc';
 
-contextBridge.exposeInMainWorld('electronAPI', {
+const api: ipcAPI = {
   getSettings: () => ipcRenderer.invoke('getConfig'),
-  acceptOffer: (offer) => ipcRenderer.send('acceptOffer', offer),
-  rejectOffer: () => ipcRenderer.send('rejectOffer'),
-  newOffer: () => ipcRenderer.send('newOffer'),
-  handleAcceptOffer: (callback) => ipcRenderer.on('acceptOffer', callback),
-  handleRejectOffer: (callback) => ipcRenderer.on('rejectOffer', callback),
-  handleTriggerNewPin: (callback) => ipcRenderer.on('triggerNewPin', callback),
-});
+  close: () => ipcRenderer.send('close'),
+
+  requireVerification: () => ipcRenderer.send('requireVerification'),
+  verificationAccepted: () => ipcRenderer.send('verificationAccepted'),
+  verificationRejected: () => ipcRenderer.send('verificationRejected'),
+  // @TODO: Remove, old implementation where the plugin generated the join URLs
+  // joinMeeting: urls => ipcRenderer.send('joinMeeting', urls),
+  joinMeeting: (url: string, layoutIndex: number) => ipcRenderer.send('joinMeeting', url, layoutIndex),
+  pluginDisconnected: () => ipcRenderer.send('pluginDisconnected'),
+
+  handleLeftMeeting: callback => ipcRenderer.on('leftMeeting', callback),
+  handleVerificationAccepted: callback => ipcRenderer.on('acceptVerification', callback),
+  handleVerificationRejected: callback => ipcRenderer.on('rejectVerification', callback),
+};
+contextBridge.exposeInMainWorld('electronAPI', api);

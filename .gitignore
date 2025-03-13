@@ -12,7 +12,6 @@ appliance-application/node_modules
 appliance-application/packages/main/dist
 appliance-application/packages/preload/dist
 appliance-application/packages/renderer/dist
-package-lock.json
 
 # Python
 .Python
@@ -40,3 +39,4 @@ venv/
 __pycache__
 .pytest_cache/
 
+.vscode/settings.json

@@ -16,14 +16,36 @@ module.exports = async function () {
       output: 'dist',
       buildResources: 'buildResources',
     },
-    files: ['packages/**/dist/**', "packages/**/assets/**"],
+    files: ['packages/**/dist/**', 'packages/**/assets/**'],
     extraMetadata: {
       version: getVersion(),
     },
 
+    npmRebuild: false,
+
+    appId: 'org.bigbluebutton.room-media.appliance',
+
     // Specify linux target just for disabling snap compilation
     linux: {
-      target: 'deb',
+      target: ['deb', 'rpm'],
     },
+    win: {
+      target: ['portable'],
+    },
+    mac: {
+      target: 'dmg',
+    },
+    deb: {
+      afterInstall: 'installer/linux/after-install.tpl',
+    },
+    rpm: {
+      afterInstall: 'installer/linux/after-install.tpl',
+    },
+
+    publish: [
+      {
+        provider: 'github',
+      },
+    ],
   };
 };

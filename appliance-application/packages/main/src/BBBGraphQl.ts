@@ -1,35 +1,32 @@
 import axios from 'axios';
-import {createClient} from 'graphql-ws';
-import WebSocket from 'ws'
+import type {Client} from 'graphql-ws';
+import { createClient} from 'graphql-ws';
+import WebSocket from 'ws';
+import type {
+  NormalizedCacheObject} from '@apollo/client/core';
 import {
   ApolloClient,
   InMemoryCache,
   ApolloLink,
   gql,
-  NormalizedCacheObject,
 } from '@apollo/client/core';
 import {GraphQLWsLink} from '@apollo/client/link/subscriptions';
 
-interface UserCurrentData {
-  user_current: {
-    authToken: string;
-  }[];
-}
-
-export class BBBGraphql {
+export class BBBGraphQl {
   private joinUrl: string;
   private cookies: string[] | undefined = undefined;
   private sessionToken: string | null = null;
   private host: string = '';
   private authToken: string = '';
+  private userId: string = '';
   private apolloClient: ApolloClient<NormalizedCacheObject> | undefined;
-  private userId: string | null = null;
+  private graphQlClient: Client;
 
-  constructor (joinUrl: string) {
+  constructor(joinUrl: string) {
     this.joinUrl = joinUrl;
   }
 
-  public async connect () {
+  public async connect(closeCallback: () => void) {
     if (!(await this.requestSessionToken())) {
       console.error('Failed to request session token.');
       return false;
@@ -53,13 +50,9 @@ export class BBBGraphql {
     return true;
   }
 
-  private async requestSessionToken (): Promise<boolean> {
+  private async requestSessionToken(): Promise<boolean> {
     try {
       console.debug('Join link used:', this.joinUrl);
-      const joinUrl = new URL(this.joinUrl);
-
-      this.userId = joinUrl.searchParams.get('userID');
-      console.debug('userId: ', this.userId);
 
       const response = await axios.get(this.joinUrl, {
         withCredentials: true,
@@ -87,39 +80,38 @@ export class BBBGraphql {
     return false;
   }
 
-  private async getAuthToken():  Promise<boolean> {
-
-    if (!(this?.apolloClient)) {
+  private async getAuthToken(): Promise<boolean> {
+    if (!this?.apolloClient) {
       return false;
     }
     const USER_CURRENT_QUERY = gql`
       query getUserCurrent {
         user_current {
           authToken
+          userId
         }
       }
     `;
 
-    const { data } = await this.apolloClient.query(
-      {
-        query: USER_CURRENT_QUERY,
-        fetchPolicy: 'network-only',
-      }
-    );
+    const {data} = await this.apolloClient.query({
+      query: USER_CURRENT_QUERY,
+      fetchPolicy: 'network-only',
+    });
 
     if (data && data?.user_current?.[0]?.authToken) {
       console.log('IN getAuthToken: ', data);
       this.authToken = data.user_current[0].authToken;
+      this.userId = data.user_current[0].userId;
       return true;
     }
 
     return false;
   }
 
-  public async connectToGraphQL () {
-    await this.initApolloClient();
+  public async connectToGraphQL() {
 
     console.debug('--- Connecting to GraphQL... ---');
+
 
     const JOIN_MUTATION = gql`
       mutation UserJoin($authToken: String!, $clientType: String!, $clientIsMobile: Boolean!) {
@@ -136,7 +128,7 @@ export class BBBGraphql {
       return false;
     }
 
-    if (!(this?.apolloClient)) {
+    if (!this?.apolloClient) {
       console.error('apolloClient is not set.');
       return false;
     }
@@ -165,7 +157,22 @@ export class BBBGraphql {
     return true;
   }
 
-  private async initApolloClient (): Promise<boolean> {
+  public async getJoinURL(params: object) {
+
+    return await axios.get(`https://${this.host}/bigbluebutton/api/getJoinUrl`, {
+      withCredentials: true,
+      headers: {
+        Cookie: this.cookies,
+      },
+      params: {
+        sessionToken: this.sessionToken,
+        ...params,
+      },
+    });
+
+  }
+
+  private async initApolloClient(): Promise<boolean> {
     let wsLink;
     try {
       // Check if cookies are not null before attempting to find a cookie
@@ -181,7 +188,7 @@ export class BBBGraphql {
 
       // You need to override the WebSocket class to add the cookie
       class WebSocketWithCookie extends WebSocket {
-        constructor (address: string, protocols?: string | string[]) {
+        constructor(address: string, protocols?: string | string[]) {
           super(address, protocols, {
             headers: {
               Cookie: jSessionCookie,
@@ -190,7 +197,7 @@ export class BBBGraphql {
         }
       }
 
-      const graphQlClient = createClient({
+      this.graphQlClient = createClient({
         url: `wss://${this.host}/graphql`,
         keepAlive: 10000,
         webSocketImpl: WebSocketWithCookie, // Pass the custom WebSocket class
@@ -211,7 +218,7 @@ export class BBBGraphql {
         },
         on: {
           error: error => {
-            console.error(`GraphQL-Client: Error: on subscription to server: ${error}`);
+            console.error('GraphQL-Client: Error: on subscription to server:', error);
           },
           closed: () => {
             console.info('GraphQL-Client: Connection closed');
@@ -222,14 +229,11 @@ export class BBBGraphql {
           connecting: () => {
             console.info('GraphQL-Client: Connecting to server');
           },
-          message: message => {
-            console.info('GraphQL-Client: Received message:', message);
-          },
         },
       });
 
-      console.debug('graphQlClient: ', graphQlClient);
-      const graphqlWsLink = new GraphQLWsLink(graphQlClient);
+      console.debug('graphQlClient: ', this.graphQlClient);
+      const graphqlWsLink = new GraphQLWsLink(this.graphQlClient);
       wsLink = ApolloLink.from([graphqlWsLink]);
       wsLink.setOnError(error => {
         throw new Error('Error: on apollo connection'.concat(JSON.stringify(error) || ''));
@@ -242,8 +246,8 @@ export class BBBGraphql {
       this.apolloClient = new ApolloClient({
         link: wsLink,
         cache: new InMemoryCache(),
-        connectToDevTools: true,
       });
+
     } catch (error) {
       console.error('Error creating Apollo Client: ', error);
       return false;
@@ -251,18 +255,19 @@ export class BBBGraphql {
     return true;
   }
 
-  public getApolloClient () {
+  public getApolloClient() {
     return this.apolloClient;
   }
 
-  public getUserId () {
-    return this.userId;
-  }
-
-  public async leaveMeeting () {
-    if (this?.apolloClient) {
+  public async leaveMeeting() {
+    if (this.apolloClient) {
       await this.apolloClient.clearStore();
       this.apolloClient.stop();
+      this.graphQlClient.dispose();
     }
+  }
+
+  public getUserId() {
+    return this.userId;
   }
 }

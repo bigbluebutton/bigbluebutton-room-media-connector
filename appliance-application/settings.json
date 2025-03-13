@@ -4,18 +4,21 @@
     "reconnect_interval": 5000,
     "ping_interval": 10000
   },
+  "auto_reject_time": 10,
   "preferred_pin_screen": "Screen left",
+  "hide_close_button": false,
+  "keyboard_hid": false,
+  "debug": false,
   "room": {
     "name": "Name of the room",
     "bbb_user_name": "RoomMedia",
     "bbb_user_id": "bbb-room-media",
-    "layouts": {
-      "CHAT_LEFT_VIDEO_RIGHT": {
-        "index": 0,
+    "layouts": [
+      {
         "label": "Chat left, video right",
         "screens": {
           "Screen left": {
-            "bbb-join-parameters": {
+            "bbb_join_parameters": {
               "enforceLayout": "participantsAndChatOnly",
               "userdata-bbb_display_notifications": false,
               "userdata-bbb_hide_nav_bar": true,
@@ -24,7 +27,7 @@
             }
           },
           "Screen right": {
-            "bbb-join-parameters": {
+            "bbb_join_parameters": {
               "userdata-bbb_hide_actions_bar": true,
               "enforceLayout": "camerasOnly",
               "userdata-bbb_display_notifications": false,
@@ -38,12 +41,11 @@
           }
         }
       },
-      "VIDEO_LEFT_PRESENTATION_RIGHT": {
-        "index": 1,
+      {
         "label": "Video left, presentation right",
         "screens": {
           "Screen left": {
-            "bbb-join-parameters": {
+            "bbb_join_parameters": {
               "userdata-bbb_hide_actions_bar": true,
               "enforceLayout": "camerasOnly",
               "userdata-bbb_display_notifications": false,
@@ -56,7 +58,7 @@
             }
           },
           "Screen right": {
-            "bbb-join-parameters": {
+            "bbb_join_parameters": {
               "userdata-bbb_self_view_disable": true,
               "enforceLayout": "presentationOnly",
               "userdata-bbb_display_notifications": false,
@@ -70,6 +72,6 @@
           }
         }
       }
-    }
+    ]
   }
 }
