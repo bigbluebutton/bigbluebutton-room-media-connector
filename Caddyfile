@@ -1,0 +1,13 @@
+room-connector.example.com {
+    
+    # BBB PLugin
+    root * /srv
+    file_server
+
+    # Room Hub
+    route /room-hub* {
+        uri strip_prefix /room-hub
+        reverse_proxy room_hub:8080
+    }
+
+}
