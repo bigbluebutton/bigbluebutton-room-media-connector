@@ -13,11 +13,7 @@ export default class BBBWebSocket {
   private verification_callback: (VerificationCode: string) => void;
   private connection_status_callback: (status: boolean) => void;
   private plugin_disconnected_callback: () => void;
-  private join_url_callback: (URL: string, layoutIndex: number) => void;
-
-  // @TODO: Remove, old implementation where the plugin generated the join URLs
-  //private join_urls_callback: (URLs: object) => void;
-
+  private join_url_callback: (URL: string) => void;
 
   constructor(roomConfig: RoomConfig, wsURL: string, reconnect_interval_time: number = 1000, ping_interval_time: number = 1000) {
     this.roomConfig = roomConfig;
@@ -45,11 +41,6 @@ export default class BBBWebSocket {
             type: 'RegisterRoom',
             roomConfig: {
               bbb_user_name: this.roomConfig.bbb_user_name,
-              layouts: this.roomConfig.layouts.map(layout => {
-                return {
-                  label: layout.label,
-                };
-              }),
             },
           }),
         );
@@ -76,7 +67,7 @@ export default class BBBWebSocket {
         }
 
         if (data.type == 'JoinURL') {
-          this.join_url_callback(data.joinUrl, data.layoutIndex);
+          this.join_url_callback(data.joinUrl);
         }
 
         /*
@@ -142,17 +133,9 @@ export default class BBBWebSocket {
     this.verification_callback = callback;
   }
 
-  setJoinUrlCallback(callback: (url: string, layoutIndex: number) => void) {
+  setJoinUrlCallback(callback: (url: string) => void) {
     this.join_url_callback = callback;
   }
-
-  /*
-  @TODO: Remove, old implementation where the plugin generated the join URLs
-  setJoinUrlCallback(callback: (URLs: object) => void) {
-    this.join_urls_callback = callback;
-  }
-   */
-
 
   setPluginDisconnectedCallback(callback: () => void) {
     this.plugin_disconnected_callback = callback;

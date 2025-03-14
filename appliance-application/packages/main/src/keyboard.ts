@@ -63,6 +63,10 @@ export class KeyboardHID implements HID {
 
   }
 
+  selectedLayout(index: number): void {
+
+  }
+
   connected(actions: HIDActions): void {
 
     this.isConnected = true;

@@ -4,6 +4,8 @@ export interface HID {
   verificationAccepted(): void;
   verificationRejected(): void;
 
+  selectedLayout(index: number): void;
+
   connected(actions: HIDActions): void;
 
   disconnected(): void;
@@ -15,7 +17,5 @@ export interface HIDActions {
   leave: () => void;
   mute: () => void;
   unmute: () => void;
-  layout1: () => void;
-  layout2: () => void;
-  layout3: () => void;
+  changeLayout: (index: number) => void;
 }

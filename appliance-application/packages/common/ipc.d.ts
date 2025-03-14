@@ -3,9 +3,7 @@ type close = () => void;
 type requireVerification = () => void;
 type verificationAccepted = () => void;
 type verificationRejected = () => void;
-// @TODO: Remove, old implementation where the plugin generated the join URLs
-// type joinMeeting = (urls: string) => void;
-type joinMeeting = (url: string, layoutIndex: number) => void;
+type joinMeeting = (url: string) => void;
 type pluginDisconnected = () => void;
 type handleLeftMeeting = (callback: () => void) => void;
 type handleVerificationAccepted = (callback: () => void) => void;

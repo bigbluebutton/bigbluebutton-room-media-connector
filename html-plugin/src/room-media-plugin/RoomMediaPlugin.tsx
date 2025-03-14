@@ -169,7 +169,7 @@ export function RoomMediaPlugin({ pluginUuid: uuid }: RoomMediaPluginProps) {
                 });
 
                 setRoomJoinUrls({
-                    "type": "JoinURL", "joinUrl": joinUrl, "layoutIndex": 0
+                    "type": "JoinURL", "joinUrl": joinUrl
                 });
                 console.debug('Hybrid-Plugin --- Got Join URL:', joinUrl);
             }

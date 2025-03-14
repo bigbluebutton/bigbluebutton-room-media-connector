@@ -1,14 +1,15 @@
 import {app} from 'electron';
 import './security-restrictions';
 import {restoreOrCreateWindow} from './mainWindow';
-import {listStreamDecks, openStreamDeck} from '@elgato-stream-deck/node';
-import {StreamDeckHID} from './streamdeck';
+import {listStreamDecks, openStreamDeck, DeviceModelId} from '@elgato-stream-deck/node';
 import {autoUpdater} from 'electron-updater';
 import fs from 'fs';
 import {DisplayManager} from './displayManager';
 import type {HID} from './HID';
 import type {Config} from '../../common/config.ts';
 import {KeyboardHID} from '/@/keyboard';
+import StreamDeckMiniHID from '/@/StreamDeckMiniHID';
+import StreamDeckHID from '/@/StreamDeckHID';
 
 export let displayManager: DisplayManager;
 export const hdiDevices: HID[] = [];
@@ -117,7 +118,19 @@ async function loadHDIDevices() {
 
     (await Promise.all(streamDecks)).forEach(streamDeck => {
       console.log('Stream Deck found: ' + streamDeck.PRODUCT_NAME);
-      hdiDevices.push(new StreamDeckHID(streamDeck));
+      switch (streamDeck.MODEL) {
+        case DeviceModelId.MINI:
+          hdiDevices.push(new StreamDeckMiniHID(streamDeck, config.room.layouts.length));
+          break;
+        case DeviceModelId.ORIGINAL:
+        case DeviceModelId.ORIGINALV2:
+        case DeviceModelId.ORIGINALMK2:
+          hdiDevices.push(new StreamDeckHID(streamDeck, config.room.layouts.length));
+          break;
+        default:
+          console.log('Unknown Stream Deck type: ' + streamDeck.PRODUCT_NAME);
+          break;
+      }
     });
   } catch (e) {
     console.error(e);
