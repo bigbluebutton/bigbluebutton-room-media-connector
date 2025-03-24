@@ -60,7 +60,7 @@ async function createWindow() {
   });
 
   // Message from the UI to join the meeting
-  ipcMain.on('joinMeeting', async (event, joinUrl: string, layoutIndex: number) => {
+  ipcMain.on('joinMeeting', async (event, joinUrl: string) => {
     console.log('joinMeeting', joinUrl);
 
     // Callback: Appliance has left the meeting or the meeting has ended
@@ -77,12 +77,6 @@ async function createWindow() {
 
       ipcMain.off('pluginDisconnected', pluginDisconnected);
     };
-
-    // @TODO: Remove, old implementation where the plugin generated the join URLs
-    //const bbbMeeting = await createBBBMeeting(joinURLs.control, joinURLs.screens, displayManager, leaveCallback);
-
-    // Get selected layout
-    const layout = config.room.layouts[layoutIndex];
 
     const bbbMeeting = await createBBBMeeting(joinUrl, displayManager, leftCallback);
 
@@ -103,22 +97,11 @@ async function createWindow() {
       */
     };
 
+    // Use first layout as the default layout
+    const layout = config.room.layouts[0];
+
     // Open the screens with the BBB HTML5 Clients
     await bbbMeeting.openScreens(layout);
-
-    //const otherLayout = config.room.layouts[2];
-    //wait 20 sec before opening the other layout
-    // setTimeout(async () => {
-    //   await bbbMeeting.openScreens(otherLayout);
-    // }, 20 * 1000);
-
-    console.log('joined');
-
-    // Wait 5 sec before unmuting the audio
-    // setTimeout(() => {
-    //   bbbMeeting.unmute();
-    //   //bbbMeeting.getMediaDevices();
-    // }, 10000);
 
     ipcMain.on('pluginDisconnected', pluginDisconnected);
 
@@ -138,11 +121,6 @@ async function createWindow() {
       ipcMain.off('pluginDisconnected', pluginDisconnected);
     };
 
-    // Log the room layouts
-    console.log('room layout 1:', config.room.layouts[0].label);
-    console.log('room layout 2:', config.room.layouts[1].label);
-    console.log('room layout 3:', config.room.layouts[2].label);
-
     // Notify all connected HDI devices that the user has joined the meeting
     hdiDevices.forEach(device => {
       device.connected({
@@ -153,20 +131,13 @@ async function createWindow() {
         unmute: () => {
           bbbMeeting.unmute();
         },
-        layout1: () => {
-          console.log('Layout 1 selected via HDI device');
-          bbbMeeting.openScreens(config.room.layouts[0]);
-          if (device instanceof StreamDeckHID) device.selectLayout(0); // TODO: make this more nice
-        },
-        layout2: () => {
-          console.log('Layout 2 selected via HDI device');
-          bbbMeeting.openScreens(config.room.layouts[1]);
-          if (device instanceof StreamDeckHID) device.selectLayout(1);
-        },
-        layout3: () => {
-          console.log('Layout 3 selected via HDI device');
-          bbbMeeting.openScreens(config.room.layouts[2]);
-          if (device instanceof StreamDeckHID) device.selectLayout(2);
+        changeLayout(index){
+          console.log('Layout '+index+' selected via HDI device');
+          bbbMeeting.openScreens(config.room.layouts[index]);
+
+          hdiDevices.forEach(device => {
+            device.selectedLayout(index);
+          });
         },
       });
     });

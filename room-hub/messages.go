@@ -51,12 +51,7 @@ type RegisterRoomMessage struct {
 }
 
 type RoomConfig struct {
-	BBBUserName string   `json:"bbb_user_name" validate:"required"`
-	Layouts     []Layout `json:"layouts" validate:"required"`
-}
-
-type Layout struct {
-	Label string `json:"label" validate:"required"`
+	BBBUserName string `json:"bbb_user_name" validate:"required"`
 }
 
 type PairingPINUserInputMessage struct {
@@ -98,21 +93,9 @@ type VerificationCodeRejectedMessage struct {
 }
 
 type JoinURLMessage struct {
-	Type        MessageType `json:"type" validate:"required"`
-	JoinURL     string      `json:"joinUrl" validate:"required"`
-	LayoutIndex int         `json:"layoutIndex" validate:"gte=0"`
+	Type    MessageType `json:"type" validate:"required"`
+	JoinURL string      `json:"joinUrl" validate:"required"`
 }
-
-// type JoinURLsMessage struct {
-// 	Type     MessageType `json:"type" validate:"required"`
-// 	JoinURLs JoinURLs    `json:"urls" validate:"required"`
-// }
-
-// // JoinURLs can contain one or more URLs.
-// type JoinURLs struct {
-// 	ControlURL string                 `json:"control" validate:"required"`
-// 	ScreenURLs map[string]interface{} `json:"screens" validate:"required"`
-// }
 
 // Room Disconnected Message
 type RoomDisconnectedMessage struct {

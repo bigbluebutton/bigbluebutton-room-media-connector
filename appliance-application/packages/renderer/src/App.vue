@@ -33,16 +33,9 @@ const onVerification = (newVerificationCode: string) => {
   window.electronAPI.requireVerification();
 };
 
-const onJoinUrl = (url: string, layoutIndex: number) => {
-  window.electronAPI.joinMeeting(url, layoutIndex);
+const onJoinUrl = (url: string) => {
+  window.electronAPI.joinMeeting(url);
 };
-
-/*
-@TODO: Remove, old implementation where plugin created multiple urls
-const onJoinUrls = urls => {
-  window.electronAPI.joinMeeting(urls);
-};
-*/
 
 window.electronAPI.handleLeftMeeting(() => {
   ws.disconnectFromPlugin();
@@ -71,8 +64,6 @@ function connect() {
   ws.setPairingPinCallback(onPairingPin);
   ws.setVerificationCallback(onVerification);
   ws.setJoinUrlCallback(onJoinUrl);
-  // @TODO: Remove, old implementation where plugin created multiple urls
-  // ws.setJoinUrlsCallback(onJoinUrls);
   ws.setPluginDisconnectedCallback(onPluginDisconnected);
 
   ws.connect();
