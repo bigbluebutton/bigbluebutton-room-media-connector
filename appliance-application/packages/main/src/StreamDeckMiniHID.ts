@@ -122,8 +122,8 @@ export default class StreamDeckMiniHID extends BaseStreamDeckHID {
   }
 
   hideVerificationButtons(): void {
-    this.streamDeck.clearKey(this.ACCEPT_BUTTON.index);
-    this.streamDeck.clearKey(this.REJECT_BUTTON.index);
+    this.streamDeck.clearKey(StreamDeckMiniHID.BUTTONS.accept.index);
+    this.streamDeck.clearKey(StreamDeckMiniHID.BUTTONS.reject.index);
   }
 
   async showLayoutButtons(): void {

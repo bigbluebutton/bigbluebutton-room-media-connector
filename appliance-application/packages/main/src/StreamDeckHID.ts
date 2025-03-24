@@ -8,25 +8,25 @@ import BaseStreamDeckHID from '/@/BaseStreamDeckHID';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export default class StreamDeckMiniHID extends BaseStreamDeckHID {
+export default class StreamDeckHID extends BaseStreamDeckHID {
   static SCREEN_PIXEL_WIDTH = 240;
   static SCREEN_PIXEL_HEIGHT = 160;
   static BUTTON_PIXEL_WIDTH = 80;
   static BUTTON_PIXEL_HEIGHT = 80;
 
   static BUTTONS = {
-    accept: { index: 0, width: StreamDeckMiniHID.BUTTON_PIXEL_WIDTH, height: StreamDeckMiniHID.BUTTON_PIXEL_HEIGHT },
-    reject: { index: 1, width: StreamDeckMiniHID.BUTTON_PIXEL_WIDTH, height: StreamDeckMiniHID.BUTTON_PIXEL_HEIGHT },
-    mute: { index: 0, width: StreamDeckMiniHID.BUTTON_PIXEL_WIDTH, height: StreamDeckMiniHID.BUTTON_PIXEL_HEIGHT },
-    unmute: { index: 1, width: StreamDeckMiniHID.BUTTON_PIXEL_WIDTH, height: StreamDeckMiniHID.BUTTON_PIXEL_HEIGHT },
+    accept: { index: 0, width: StreamDeckHID.BUTTON_PIXEL_WIDTH, height: StreamDeckHID.BUTTON_PIXEL_HEIGHT },
+    reject: { index: 1, width: StreamDeckHID.BUTTON_PIXEL_WIDTH, height: StreamDeckHID.BUTTON_PIXEL_HEIGHT },
+    mute: { index: 0, width: StreamDeckHID.BUTTON_PIXEL_WIDTH, height: StreamDeckHID.BUTTON_PIXEL_HEIGHT },
+    unmute: { index: 1, width: StreamDeckHID.BUTTON_PIXEL_WIDTH, height: StreamDeckHID.BUTTON_PIXEL_HEIGHT },
 
-    layout_0: {index: 5, width: StreamDeckMiniHID.BUTTON_PIXEL_WIDTH, height: StreamDeckMiniHID.BUTTON_PIXEL_HEIGHT },
-    layout_1: { index: 6, width: StreamDeckMiniHID.BUTTON_PIXEL_WIDTH, height: StreamDeckMiniHID.BUTTON_PIXEL_HEIGHT },
-    layout_2: { index: 7, width: StreamDeckMiniHID.BUTTON_PIXEL_WIDTH, height: StreamDeckMiniHID.BUTTON_PIXEL_HEIGHT },
-    layout_3: { index: 8, width: StreamDeckMiniHID.BUTTON_PIXEL_WIDTH, height: StreamDeckMiniHID.BUTTON_PIXEL_HEIGHT },
-    layout_4: { index: 9, width: StreamDeckMiniHID.BUTTON_PIXEL_WIDTH, height: StreamDeckMiniHID.BUTTON_PIXEL_HEIGHT },
+    layout_0: {index: 5, width: StreamDeckHID.BUTTON_PIXEL_WIDTH, height: StreamDeckHID.BUTTON_PIXEL_HEIGHT },
+    layout_1: { index: 6, width: StreamDeckHID.BUTTON_PIXEL_WIDTH, height: StreamDeckHID.BUTTON_PIXEL_HEIGHT },
+    layout_2: { index: 7, width: StreamDeckHID.BUTTON_PIXEL_WIDTH, height: StreamDeckHID.BUTTON_PIXEL_HEIGHT },
+    layout_3: { index: 8, width: StreamDeckHID.BUTTON_PIXEL_WIDTH, height: StreamDeckHID.BUTTON_PIXEL_HEIGHT },
+    layout_4: { index: 9, width: StreamDeckHID.BUTTON_PIXEL_WIDTH, height: StreamDeckHID.BUTTON_PIXEL_HEIGHT },
 
-    leave: { index: 14, width: StreamDeckMiniHID.BUTTON_PIXEL_WIDTH, height: StreamDeckMiniHID.BUTTON_PIXEL_HEIGHT },
+    leave: { index: 14, width: StreamDeckHID.BUTTON_PIXEL_WIDTH, height: StreamDeckHID.BUTTON_PIXEL_HEIGHT },
 
   };
 
@@ -46,10 +46,10 @@ export default class StreamDeckMiniHID extends BaseStreamDeckHID {
 
       if (this.hasVerificationPending) {
         switch (button.index) {
-          case StreamDeckMiniHID.BUTTONS.accept.index:
+          case StreamDeckHID.BUTTONS.accept.index:
             this.acceptCallback();
             break;
-          case StreamDeckMiniHID.BUTTONS.reject.index:
+          case StreamDeckHID.BUTTONS.reject.index:
             this.rejectCallback();
             break;
         }
@@ -57,28 +57,28 @@ export default class StreamDeckMiniHID extends BaseStreamDeckHID {
 
       if (this.isConnected) {
         switch (button.index) {
-          case StreamDeckMiniHID.BUTTONS.mute.index:
+          case StreamDeckHID.BUTTONS.mute.index:
             this.actions.mute();
             break;
-          case StreamDeckMiniHID.BUTTONS.unmute.index:
+          case StreamDeckHID.BUTTONS.unmute.index:
             this.actions.unmute();
             break;
-          case StreamDeckMiniHID.BUTTONS.leave.index:
+          case StreamDeckHID.BUTTONS.leave.index:
             this.actions.leave();
             break;
-          case StreamDeckMiniHID.BUTTONS.layout_0.index:
+          case StreamDeckHID.BUTTONS.layout_0.index:
             this.changeLayout(0);
             break;
-          case StreamDeckMiniHID.BUTTONS.layout_1.index:
+          case StreamDeckHID.BUTTONS.layout_1.index:
             this.changeLayout(1);
             break;
-          case StreamDeckMiniHID.BUTTONS.layout_2.index:
+          case StreamDeckHID.BUTTONS.layout_2.index:
             this.changeLayout(2);
             break;
-          case StreamDeckMiniHID.BUTTONS.layout_3.index:
+          case StreamDeckHID.BUTTONS.layout_3.index:
             this.changeLayout(3);
             break;
-          case StreamDeckMiniHID.BUTTONS.layout_4.index:
+          case StreamDeckHID.BUTTONS.layout_4.index:
             this.changeLayout(4);
             break;
         }
@@ -111,8 +111,8 @@ export default class StreamDeckMiniHID extends BaseStreamDeckHID {
   showVerificationButtons(): void {
     super.showVerificationButtons();
 
-    this.setButtonImage(StreamDeckMiniHID.BUTTONS.accept, 'accept.png');
-    this.setButtonImage(StreamDeckMiniHID.BUTTONS.reject, 'reject.png');
+    this.setButtonImage(StreamDeckHID.BUTTONS.accept, 'accept.png');
+    this.setButtonImage(StreamDeckHID.BUTTONS.reject, 'reject.png');
   }
 
   async showBBBScreen(): void {
@@ -121,8 +121,8 @@ export default class StreamDeckMiniHID extends BaseStreamDeckHID {
     this.streamDeck.fillPanelBuffer(await sharp(path.resolve(__dirname, '../assets/bbb.png'))
       .flatten()
       .resize(
-        StreamDeckMiniHID.SCREEN_PIXEL_WIDTH,
-        StreamDeckMiniHID.SCREEN_PIXEL_HEIGHT,
+        StreamDeckHID.SCREEN_PIXEL_WIDTH,
+        StreamDeckHID.SCREEN_PIXEL_HEIGHT,
         {
           fit: 'contain',
           background: {r: 0, g: 0, b: 0},
@@ -133,18 +133,18 @@ export default class StreamDeckMiniHID extends BaseStreamDeckHID {
   }
 
   hideVerificationButtons(): void {
-    this.streamDeck.clearKey(this.ACCEPT_BUTTON.index);
-    this.streamDeck.clearKey(this.REJECT_BUTTON.index);
+    this.streamDeck.clearKey(StreamDeckHID.BUTTONS.accept.index);
+    this.streamDeck.clearKey(StreamDeckHID.BUTTONS.reject.index);
   }
 
   async showLayoutButtons(): void {
 
     // Get list of all buttons starting with "layout_"
-    const layoutButtons = Object.keys(StreamDeckMiniHID.BUTTONS).filter(key => key.startsWith('layout_'));
+    const layoutButtons = Object.keys(StreamDeckHID.BUTTONS).filter(key => key.startsWith('layout_'));
 
     // Loop through all layout buttons and set the image for the selected layout to black and white and the others to white and black
     for (const key of layoutButtons) {
-      const button = StreamDeckMiniHID.BUTTONS[key];
+      const button = StreamDeckHID.BUTTONS[key];
 
       const layoutIndex = parseInt(key.split('_')[1]);
 
@@ -172,9 +172,9 @@ export default class StreamDeckMiniHID extends BaseStreamDeckHID {
   connected(actions: HIDActions): void {
     this.streamDeck.clearPanel();
 
-    this.setButtonImage(StreamDeckMiniHID.BUTTONS.mute, 'mute.png');
-    this.setButtonImage(StreamDeckMiniHID.BUTTONS.unmute, 'unmute.png');
-    this.setButtonImage(StreamDeckMiniHID.BUTTONS.leave, 'leave.png');
+    this.setButtonImage(StreamDeckHID.BUTTONS.mute, 'mute.png');
+    this.setButtonImage(StreamDeckHID.BUTTONS.unmute, 'unmute.png');
+    this.setButtonImage(StreamDeckHID.BUTTONS.leave, 'leave.png');
 
     this.showLayoutButtons(0);
 
