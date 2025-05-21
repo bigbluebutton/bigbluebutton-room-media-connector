@@ -1,0 +1,29 @@
+services:
+  room-connector-plugin:
+    image: room-conntector-plugin:latest
+    container_name: room_connector_plugin
+    volumes:
+      - ./plugins:/plugins
+
+  room_hub:
+    image: ghcr.io/bigbluebutton/bigbluebutton-room-media-connector:develop
+    container_name: room_hub
+    restart: unless-stopped
+    networks:
+      - room_hub_network
+
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    volumes:
+      - ./plugins:/srv:ro
+      - ./caddy:/etc/caddy:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - room_hub_network
+
+networks:
+  room_hub_network:
+    driver: bridge
